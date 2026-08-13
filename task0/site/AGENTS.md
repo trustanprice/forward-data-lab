@@ -18,11 +18,15 @@ build step, and no runtime dependency on the rest of the repo.
   rank-shift table, the `top_k=5` exclusion result, the narrative-emphasis
   observation) that `demo/sample_output_naive.json` alone doesn't capture
   (that file only records the *naive* run, not the Fix 1 / Fix 2 passes).
-- All content is hand-transcribed from those two sources into
-  `site/index.html` at build time — this page does not fetch or parse them
-  at runtime. If the underlying numbers change (e.g. the demo is re-run,
-  the threshold is recalibrated), this page goes stale silently and must be
-  manually re-synced.
+- The live conversation that produced this project — the `#questions`
+  section (see below) is condensed, faithful transcription of actual
+  design-review questions asked and answered during development, not
+  invented FAQ copy.
+- All content is hand-transcribed from those sources into `site/index.html`
+  at build time — this page does not fetch or parse them at runtime. If the
+  underlying numbers change (e.g. the demo is re-run, the threshold is
+  recalibrated), this page goes stale silently and must be manually
+  re-synced.
 
 ## Outputs
 
@@ -75,10 +79,22 @@ Built and published as a Claude Artifact
 (https://claude.ai/code/artifact/21ef8d2d-33ad-400b-a887-d1bedaf4d80b).
 Covers all five narrative sections from the original brief (hero/intro,
 naive-pipeline honest surprise, Fix 1, Fix 2 with its two documented
-limitations, conclusion), plus an interactive "Run it yourself" console
-inserted right after the hero — see the convention above for exactly what
-it computes live vs. replays verbatim. All numbers and quotes are
-transcribed from the live run, not invented. Verified: JS syntax-checked
-clean, every element ID referenced by the script exists exactly once in the
-markup, section tags balanced, file confirmed UTF-8 with the charset meta
-tag as the first byte.
+limitations, conclusion), an interactive "Run it yourself" console inserted
+right after the hero (see the convention above for exactly what it computes
+live vs. replays verbatim), and a "Questions I Asked" accordion
+(`#questions`, five items) inserted right before the conclusion — five
+real design-review exchanges, condensed but faithful: whether the off-topic
+query is really about citation count (no — retrieval never sees citations),
+whether Fix 1 improves retrieval (no — it's a post-retrieval trust gate),
+whether Fix 2 runs after generation (no — both fixes finish before the LLM
+is ever called), what alpha should be set to and how to use it
+strategically, and whether the similarity threshold should adapt lower for
+under-covered/emerging topics (argued no, and why — circularity plus the
+worse failure mode). Accordion uses a CSS grid-template-rows 0fr→1fr
+transition for smooth open/close with no JS height measuring.
+
+All numbers and quotes are transcribed from the live run or the actual
+conversation, not invented. Verified: JS syntax-checked clean, every
+element ID referenced by the script exists exactly once in the markup,
+section tags balanced, file confirmed UTF-8 with the charset meta tag as
+the first byte.

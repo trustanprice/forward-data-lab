@@ -851,6 +851,72 @@
 
   .report-reveal__text { font-size: 14px; line-height: 1.68; color: var(--ink-1); white-space: pre-wrap; }
 
+  /* ---------- questions I asked ---------- */
+
+  .qa-list { display: flex; flex-direction: column; gap: 14px; }
+
+  .qa-item { overflow: hidden; transition: border-color 0.25s ease; }
+
+  .qa-item__q {
+    appearance: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 22px 26px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+
+  .qa-item__q:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+
+  .qa-item__index {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-3);
+    flex-shrink: 0;
+    width: 20px;
+  }
+
+  .qa-item__q-text {
+    flex: 1;
+    font-size: 15.5px;
+    font-weight: 560;
+    color: var(--ink-0);
+    line-height: 1.5;
+  }
+
+  .qa-item__chevron {
+    flex-shrink: 0;
+    color: var(--accent-strong);
+    font-size: 13px;
+    transition: transform 0.3s ease;
+  }
+
+  .qa-item.is-open { border-color: var(--glass-border-strong); }
+  .qa-item.is-open .qa-item__chevron { transform: rotate(180deg); }
+
+  .qa-item__a {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.35s ease;
+  }
+
+  .qa-item.is-open .qa-item__a { grid-template-rows: 1fr; }
+
+  .qa-item__a-inner { overflow: hidden; }
+
+  .qa-item__a-inner p {
+    margin: 0;
+    padding: 0 26px 26px 62px;
+    font-size: 14.5px;
+    line-height: 1.68;
+    color: var(--ink-1);
+  }
+
   /* ---------- reveal on scroll ---------- */
 
   .reveal {
@@ -1071,6 +1137,79 @@ threshold:  0.30</code>
         <p>Blend: log-scaled citation count + normalized similarity, weighted 50/50, within the retrieved pool.</p>
         <p class="callout">Top-k still decides who's in the room.</p>
       </aside>
+    </div>
+  </section>
+
+  <section id="questions">
+    <div class="eyebrow">Design review — questions I pushed on</div>
+    <h2>Questions I asked</h2>
+    <p class="lede">Building this surfaced real tradeoffs worth interrogating — including a few places where my first instinct about how these fixes actually work turned out to be wrong.</p>
+
+    <div class="qa-list">
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">01</span>
+          <span class="qa-item__q-text">Isn't the off-topic query just testing whether high-citation papers get pulled in regardless of relevance?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>No — retrieval runs on embedding similarity alone; citation count never enters into which papers make top-k. Only Fix 2 uses it, and only to reorder papers retrieval already found. What the off-topic query actually proves is that naive top-k has no relevance floor — it returned 8 "top" papers for the coral-reef query with similarity scores from −0.034 to 0.024, pure noise, and ranked them with the same confidence as a real match. The theoretical risk is an LLM forced to answer from those 8 irrelevant papers, producing something that reads as grounded while answering the wrong question. In the live run here, Claude Opus 5 caught the mismatch itself and declined — which doesn't make the risk fake, it means this model, this once, didn't need Fix 1 to avoid it.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">02</span>
+          <span class="qa-item__q-text">Does Fix 1 improve retrieval — get us more similar papers to choose from?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>No. Fix 1 never touches retrieval or the candidate pool — the top-k list is identical whether it's on or off. It's a gate applied <em style="font-style:normal;color:var(--ink-0);">after</em> retrieval runs, deciding whether the single best match found is good enough to trust at all. If the embedding model or the corpus never finds a truly relevant paper in the first place, nothing in Fix 1 rescues that — it can only decide, honestly, whether to admit the result isn't good enough.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">03</span>
+          <span class="qa-item__q-text">Is Fix 2 a post-generation step — does alpha rearrange the report after it's written?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>No — both fixes finish their work <em style="font-style:normal;color:var(--ink-0);">before</em> generation starts. The real order is retrieval → Fix 1 gate → Fix 2 rerank (if enabled) → generation, last. Fix 2 decides what order the papers are handed to the model as context; it never touches a report, because at the point it runs, no report exists yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">04</span>
+          <span class="qa-item__q-text">What should alpha actually be set to — is one fixed value enough?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>α = 1 is pure similarity; α = 0 is pure citation count. A fixed 0.5 is a reasonable default, but the sharper answer: lean toward similarity for emerging or narrowly technical questions — citations take years to accumulate, so heavy citation-weighting structurally buries new work — and toward citations for "what's the standard approach" questions, or when the embedding model's precision is shaky. The more rigorous version doesn't hardcode alpha at all: it's query-adaptive, and it retrieves a wider pool before reranking, since right now Fix 2 can only reorder whatever already survived the same top-k cutoff retrieval used.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">05</span>
+          <span class="qa-item__q-text">Should the similarity threshold adapt too — go lower for emerging topics with less published work?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>I pushed back on my own instinct here. Lowering the threshold for presumed topic novelty is circular — you can't know a topic is under-covered without already having assessed the thing the threshold measures. It's also the more dangerous failure mode: it lets thin, tangential evidence get accepted as sufficient, producing a more convincing wrong answer instead of an honest "not enough here." The better fix is calibrating the threshold relative to the corpus's own similarity distribution rather than one hand-picked constant, and checking the gap between the top result and the rest of the pool — a real signal often stands out from its own noise floor even at a modest absolute score.</p>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -1314,6 +1453,15 @@ threshold:  0.30</code>
   });
 
   render();
+
+  // ---------- questions I asked accordion ----------
+  Array.prototype.forEach.call(document.querySelectorAll('.qa-item'), function (item) {
+    var btn = item.querySelector('.qa-item__q');
+    btn.addEventListener('click', function () {
+      var isOpen = item.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+  });
 
   // ---------- reveal on scroll ----------
   var revealEls = document.querySelectorAll('.reveal');
