@@ -28,9 +28,13 @@ Concretely, this repo:
 2. Embeds the corpus and answers queries via cosine-similarity top-k retrieval.
 3. Generates a short LLM-synthesized report over the top-k context, with
    inline citations back to source papers.
-4. Demonstrates, with a real on-topic/off-topic query pair, how naive top-k
-   retrieval is fragile — off-topic queries still return a forced, plausible-
-   sounding synthesis from irrelevant papers.
+4. Demonstrates, with a real on-topic/off-topic query pair, that naive top-k
+   *retrieval* is fragile (near-zero, noise-level similarity scores on an
+   off-topic query) — and that whether the generated report actually reflects
+   that fragility depends entirely on unverified, model-specific prompt
+   behavior unless something mechanical enforces it. See `demo/AGENTS.md`
+   for the actual observed result, which was more nuanced than "always
+   forces a bad answer."
 5. Fixes that with two concrete, minimal mechanisms:
    - **Fix 1 — relevance confidence threshold**: refuse to synthesize when
      nothing in the candidate pool actually clears a similarity bar.
@@ -92,22 +96,31 @@ as the "can it be implemented" demonstration plus a proposed improvement.
       short report with inline citations. Implemented with **Fix 1 built in**
       as a togglable gate (`enforce_threshold`, default `True`) rather than
       as a separate naive version — see `src/generation/AGENTS.md`.
-- [x] Fix 1 (relevance confidence threshold) implemented. Verified without
-      an API key: the off-topic query is refused before any LLM call is made
-      (`refused=True`, zero Anthropic API calls). On-topic verification and
-      the naive-vs-fixed report comparison still need a live run.
+- [x] Fix 1 (relevance confidence threshold) implemented and fully verified,
+      including live: the off-topic query is refused before any LLM call is
+      made (`refused=True`, zero Anthropic API calls, confirmed both with
+      and without an API key present). See `src/generation/AGENTS.md`.
 - [x] Fix 2 (citation-weighted reranking, `src/rerank/rerank.py`)
-      implemented and verified standalone (no LLM needed) — the 16,973-
-      citation seminal paper moves from rank 6 (pure similarity) to rank 2
-      (blended) on the on-topic query. See `src/rerank/AGENTS.md`.
-- [x] `demo/run_demo.py` orchestration script written.
-- [ ] **Blocked on `ANTHROPIC_API_KEY`**: the failure demo's actual LLM-
-      generated report text — naive pipeline (forced synthesis on the
-      off-topic query), Fix 1 alone, and Fix 1 + Fix 2 — needs a live run to
-      capture and compare. Everything that *doesn't* require a live model
-      call has already been verified (see above).
-- [ ] Final AGENTS.md pass + consolidated failure-modes/tradeoffs notes for
-      the report, once the live demo output is in.
+      implemented and verified — the 16,973-citation seminal paper moves
+      from rank 6 (pure similarity) to rank 2 (blended) on the on-topic
+      query; also confirmed it cannot rescue a paper excluded from the pool
+      at a smaller `top_k`, and that its effect on the *generated narrative*
+      specifically was smaller than its effect on ranking in this test. See
+      `src/rerank/AGENTS.md`.
+- [x] `demo/run_demo.py` orchestration script written and run live for all
+      three flag combinations (naive, Fix 1, Fix 1 + Fix 2).
+- [x] **Failure demo run live** (`ANTHROPIC_API_KEY` provided
+      2026-08-13). Result was more nuanced than originally expected — the
+      naive off-topic call did *not* produce a forced/misleading synthesis;
+      Claude Opus 5 correctly declined via its system-prompt instruction.
+      This doesn't undercut Fix 1's value (see the reasoning in
+      `demo/AGENTS.md` and `src/generation/AGENTS.md`) — it's an honest,
+      more interesting finding than the originally hypothesized failure,
+      and it's now the project's central nuance: retrieval is fragile,
+      generation-time recovery is real but unverified and non-free, and
+      Fix 1 replaces "hope" with a mechanical guarantee.
+- [x] Final AGENTS.md pass reflecting the real demo output, and the
+      consolidated failure-modes/tradeoffs notes below, are complete.
 
 ## Known design tradeoffs (updated as they're discovered)
 
@@ -127,3 +140,18 @@ detail behind each line once filled in.
   — relative rather than absolute calibration): see `src/rerank/AGENTS.md`.
 - Fix 1 as a togglable gate rather than a separate naive implementation
   (`enforce_threshold` parameter): see `src/generation/AGENTS.md`.
+- **The naive off-topic failure mode didn't reproduce as hard-failure LLM
+  hallucination in this test** (Claude Opus 5, well-prompted, correctly
+  declined) — the fragility that's unambiguously real and reproducible is
+  in *retrieval* (near-zero similarity scores), not necessarily in every
+  model's generation-time behavior. Fix 1 is valuable because it makes the
+  refusal mechanical/free/verifiable, not because generation-time recovery
+  is impossible. See `demo/AGENTS.md` and `src/generation/AGENTS.md`.
+- **Fix 2's effect on ranking is unambiguous and verified twice over
+  (moves the seminal paper from rank 6→2; provably can't rescue a paper
+  excluded at a smaller `top_k`), but its effect on the LLM's generated
+  narrative was smaller than expected** in a single test — likely because
+  citation counts are already visible as plain text in the generation
+  context regardless of numbering order. Worth stating honestly in the
+  write-up rather than assuming reordering always changes what the model
+  emphasizes: see `src/rerank/AGENTS.md`.

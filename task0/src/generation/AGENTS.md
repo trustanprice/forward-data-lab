@@ -39,9 +39,10 @@ sufficiently relevant papers found" message instead of forcing a synthesis.
   provided numbered abstracts, cite inline with bracketed numbers (`[1]`,
   `[2]`, ...) matching the numbered context list, and to say plainly if the
   abstracts don't support an answer rather than forcing one. This is a
-  prompt-level mitigation and is **not** a substitute for Fix 1 — see the
-  failure demo notes for why the prompt alone doesn't reliably stop a
-  forced synthesis on an off-topic query.
+  prompt-level mitigation, and it is **not a substitute for Fix 1** even
+  though it worked in the one case tested here — see the design tradeoff
+  below and `demo/AGENTS.md` for the actual observed result and why "it
+  happened to work once" isn't the same as "reliable."
 - `response.stop_reason == "refusal"` is handled explicitly (Claude Opus 5
   can decline via safety classifiers, distinct from Fix 1's own refusal).
 
@@ -49,32 +50,49 @@ sufficiently relevant papers found" message instead of forcing a synthesis.
 
 Without Fix 1, the only thing stopping the model from confidently answering
 an off-topic query is a system-prompt instruction to "say so plainly" when
-the abstracts don't support an answer. That's real signal worth keeping (it
-improves *how* the model handles borderline cases where some genuine
-partial relevance exists) — but prompt instructions are advisory, not
-enforced: a capable model asked to synthesize a report from *any* set of
-abstracts can generally find some plausible-sounding angle to write about,
-even when none of the source material is actually relevant. Fix 1 moves the
-decision out of the prompt and into code that inspects the actual
-similarity scores *before* the LLM is ever called — mechanical, not
-persuasive, and (as implemented here) literally makes zero API calls when it
-fires. Whether the naive prompt-only path actually produces a forced/
-misleading answer in practice — as opposed to this being merely the
-expected failure mode — is exactly what the failure demo is for; see
-`demo/AGENTS.md` for the observed result once it's run.
+the abstracts don't support an answer. **Tested with `--no-threshold` on
+the off-topic query (see `demo/AGENTS.md` for the full text): it worked.**
+Claude Opus 5 correctly identified that none of the 8 near-zero-similarity
+RAG papers addressed the (unrelated) query and said so directly, instead of
+forcing a synthesis. That's a genuinely useful data point, and it means the
+prompt-level mitigation is more effective than this project initially
+assumed — but it does **not** make Fix 1 redundant:
+
+- It's **advisory, not enforced** — one model, one prompt wording, one
+  maximally-obvious topic mismatch. Nothing guarantees a different model,
+  a subtler/borderline-relevant query, or a differently-worded prompt
+  behaves the same way.
+- It's **not free** — the LLM still got called (and billed) to reach that
+  correct-but-negative conclusion. Fix 1 reaches the same conclusion from a
+  cosine similarity check, for free, before any API call.
+- It's **not inspectable in advance** — you only find out the model
+  declined by reading its output; Fix 1's decision is a number you can log,
+  test, and reason about directly.
+- It's exactly the behavior this project set out to question in the first
+  place: **Asta, per the original testing that motivated this project,
+  does not do this** — it synthesizes from its top-50 regardless of
+  quality. This demo shows a well-prompted frontier model *can* behave
+  honestly on an obvious mismatch, which makes it more notable, not less,
+  that a production system apparently doesn't reliably do so. The
+  difference is precisely whether a mechanism like Fix 1 (or equally
+  careful prompting) is actually built into the pipeline, not whether it's
+  possible in principle.
 
 ## Current state
 
-Implemented, including Fix 1. `answer_query()` takes `enforce_threshold`
-(default `True`) so the same code path can reproduce the naive pre-fix
-behavior (`enforce_threshold=False`, or `--no-threshold` on the CLI) for the
-failure demo, rather than maintaining two separate implementations.
+Implemented, including Fix 1, and fully run end-to-end with a live
+`ANTHROPIC_API_KEY`. `answer_query()` takes `enforce_threshold` (default
+`True`) so the same code path reproduces the naive pre-fix behavior
+(`enforce_threshold=False`, or `--no-threshold` on the CLI) rather than
+maintaining two separate implementations.
 
-Verified without an API key: calling `answer_query()` on the off-topic query
-(similarity 0.024, well under the 0.30 threshold) returns
-`refused=True` and the fixed message, with **no Anthropic API call made at
-all** (confirmed — no auth error, meaning `generate_report()` never ran).
-
-Not yet verified: the actual LLM call path (on-topic query, and the
-`--no-threshold` naive/off-topic path that's supposed to demonstrate the
-forced-synthesis failure) — blocked on `ANTHROPIC_API_KEY` being available.
+- **Fix 1's refusal path** — verified with no API key needed at all: the
+  off-topic query (similarity 0.024, under the 0.30 threshold) returns
+  `refused=True` and the fixed message, with zero Anthropic API calls made.
+- **On-topic generation** — verified live: produced a well-grounded report
+  with correct inline citations, accurate summaries of methods/results, and
+  real named limitations pulled from the abstracts (see
+  `demo/sample_output_naive.json`).
+- **Naive off-topic generation (`--no-threshold`)** — verified live: see
+  the design tradeoff above and `demo/AGENTS.md` for the full result and
+  why it doesn't change Fix 1's value.

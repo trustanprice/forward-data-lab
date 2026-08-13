@@ -62,7 +62,27 @@ honestly:
   for a query didn't make it into the similarity-based candidate pool in
   the first place (an embedding-quality problem, not a reranking problem),
   no amount of citation-weighted reranking can recover it. Fix 2 improves
-  *ranking of what was found*; it does not fix *what gets found*.
+  *ranking of what was found*; it does not fix *what gets found*. **Verified
+  directly, not just theorized:** at `top_k=5` (instead of 8) on the same
+  query, the seminal 16,973-citation paper (rank 6 by pure similarity) is
+  excluded from the pool before `blend_scores()` ever runs — confirmed via
+  `rank(query, top_k=5)` then checking membership. Fix 2 had no chance to
+  surface it. This is the sharpest illustration of the limitation: a
+  smaller `top_k` makes Fix 2 *less* able to compensate for retrieval
+  fragility, not more, since it shrinks the pool citation-weighting can
+  work with.
+- **Effect on the LLM narrative may be smaller than the effect on ranking.**
+  Tested live: reranking the on-topic query's pool changed the seminal
+  paper's citation number from `[6]` to `[2]`, but the generated report's
+  *emphasis* was similar either way — it was already described as "the
+  original RAG formulation" in the non-reranked version too. Likely
+  explanation: `src/generation/generate.py`'s context block already states
+  each paper's citation count as plain text, so a capable model can pick up
+  on "this one has 16,973 citations" regardless of numbering order. Fix 2's
+  clearest, most reliable value in this pipeline is on the *retrieval/
+  ranking* side (what makes it into a capped top-k, what a human skimming
+  raw scores would see first) rather than guaranteed narrative influence —
+  see `demo/AGENTS.md` for the full comparison.
 
 ## Current state
 
