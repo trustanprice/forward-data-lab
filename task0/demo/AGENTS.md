@@ -35,15 +35,39 @@ it.
 
 ## Query pair and observed results
 
-Filled in once the pipeline is built and the demo has actually run — this
-section becomes the record of what was actually observed, not a plan.
+Finalized:
 
-- **On-topic query:** *(pending)*
-- **Off-topic query:** *(pending)*
-- **Naive pipeline (no fixes) result:** *(pending)*
-- **After Fix 1 (relevance threshold):** *(pending)*
-- **After Fix 1 + Fix 2 (citation-weighted reranking):** *(pending)*
+- **On-topic query:** `"How does retrieval-augmented generation reduce
+  hallucinations in large language models?"` — top-8 similarities
+  0.396-0.567.
+- **Off-topic query:** `"What are the effects of ocean acidification on
+  coral reef ecosystems?"` — top-8 similarities -0.034-0.024.
+
+Filled in once the LLM-backed runs actually happen:
+
+- **Naive pipeline (`--no-threshold`, no `--rerank`) result:** *(pending —
+  needs `ANTHROPIC_API_KEY`)*
+- **After Fix 1 (default flags, threshold enforced):** partially confirmed
+  without an API key — the off-topic query is refused before any LLM call
+  (`refused=True`, "No sufficiently relevant papers found..."; see
+  `src/generation/AGENTS.md`). The on-topic side of this comparison (does
+  Fix 1 leave a genuine answer untouched?) still needs a live run.
+- **After Fix 1 + Fix 2 (`--rerank`):** the reranking effect itself is
+  confirmed independent of the LLM — see `src/rerank/AGENTS.md` for the
+  observed rank changes. The full generated-report comparison needs a live
+  run.
 
 ## Current state
 
-Not yet implemented — depends on every other module.
+Implemented (`demo/run_demo.py`). Everything that doesn't require a live
+Claude API call has been verified:
+- Fix 1's refusal path (off-topic query, default flags) — confirmed via
+  direct `answer_query()` call, zero API calls made.
+- Fix 2's reranking effect on the retrieved pool — confirmed via
+  `src/rerank/rerank.py`, see table in `src/rerank/AGENTS.md`.
+
+Blocked on `ANTHROPIC_API_KEY`: the actual generated-report text for both
+queries, under all three flag combinations (naive, Fix 1 only, Fix 1 + Fix
+2) — this is the part of the failure demo that needs a real LLM call to
+show what a forced synthesis on the off-topic query actually looks like,
+and to confirm the on-topic report reads correctly with inline citations.

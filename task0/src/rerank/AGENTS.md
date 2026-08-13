@@ -66,4 +66,24 @@ honestly:
 
 ## Current state
 
-Not yet implemented.
+Implemented and verified — this module needs no LLM, so it was fully
+testable without an API key. Run against the real corpus, query "How does
+retrieval-augmented generation reduce hallucinations in large language
+models?", `top_k=8`, `alpha=0.5`:
+
+| rank (pure similarity) | rank (blended) | paper | similarity | citations | blended |
+|---|---|---|---|---|---|
+| 1 | 1 | Benchmarking RAG for Medicine | 0.567 | 588 | 0.689 |
+| 6 | **2** | **RAG for Knowledge-Intensive NLP Tasks (Lewis et al. 2020)** | 0.425 | **16,973** | 0.583 |
+| 5 | 3 | RAG for LLMs: A Survey | 0.465 | 3,837 | 0.564 |
+| 3 | 4 | RAGAs | 0.502 | 909 | 0.539 |
+| 8 | 8 | MTRAG | 0.396 | 76 | 0.000 |
+
+The original 2020 RAG paper — by far the most established, highest-impact
+work in the corpus — moves from rank 6 to rank 2 once citation weight is
+applied, exactly the intended fix for the flaw observed in Asta (citation
+counts displayed but never used to weight the narrative). The lowest-cited
+paper in the top-8 (MTRAG, 76 citations) drops to a blended score of 0.000
+despite a respectable 0.396 similarity, illustrating the tradeoff noted
+above: `alpha=0.5` genuinely can bury a recent, narrowly-relevant paper
+behind more established ones.

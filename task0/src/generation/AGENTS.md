@@ -18,9 +18,11 @@ sufficiently relevant papers found" message instead of forcing a synthesis.
 
 ## Outputs
 
-- `answer_query(query, top_k, threshold, use_rerank)` → `{"query", "papers",
-  "report", "refused"}`. `refused=True` means Fix 1 fired and no LLM call
-  was made at all — `"report"` is a fixed message, not a model output.
+- `answer_query(query, top_k, threshold, use_rerank, enforce_threshold=True)`
+  → `{"query", "papers", "report", "refused"}`. `refused=True` means Fix 1
+  fired and no LLM call was made at all — `"report"` is a fixed message, not
+  a model output. `enforce_threshold=False` (`--no-threshold` on the CLI)
+  reproduces the naive pre-fix behavior for the failure demo.
 
 ## Conventions
 
@@ -45,20 +47,34 @@ sufficiently relevant papers found" message instead of forcing a synthesis.
 
 ## Design tradeoff — prompting for honesty vs. mechanically enforcing it
 
-Before Fix 1 existed, the only thing stopping the model from confidently
-answering an off-topic query was a system-prompt instruction to "say so
-plainly" when the abstracts don't support an answer. That is real signal
-worth keeping (it improves *how* the model handles borderline cases where
-some genuine partial relevance exists) — but the failure demo showed it is
-not sufficient on its own: a capable model asked to synthesize a report
-from *any* set of abstracts will generally find some plausible-sounding
-angle to write about, even when none of the source material is actually
-relevant to the question asked. That's exactly the "plausible-sounding
-synthesis from a mismatched candidate set" failure mode this whole project
-is about. Fix 1 moves the decision out of the prompt and into code that
-inspects the actual similarity scores *before* the LLM is ever called —
-mechanical, not persuasive.
+Without Fix 1, the only thing stopping the model from confidently answering
+an off-topic query is a system-prompt instruction to "say so plainly" when
+the abstracts don't support an answer. That's real signal worth keeping (it
+improves *how* the model handles borderline cases where some genuine
+partial relevance exists) — but prompt instructions are advisory, not
+enforced: a capable model asked to synthesize a report from *any* set of
+abstracts can generally find some plausible-sounding angle to write about,
+even when none of the source material is actually relevant. Fix 1 moves the
+decision out of the prompt and into code that inspects the actual
+similarity scores *before* the LLM is ever called — mechanical, not
+persuasive, and (as implemented here) literally makes zero API calls when it
+fires. Whether the naive prompt-only path actually produces a forced/
+misleading answer in practice — as opposed to this being merely the
+expected failure mode — is exactly what the failure demo is for; see
+`demo/AGENTS.md` for the observed result once it's run.
 
 ## Current state
 
-Not yet implemented.
+Implemented, including Fix 1. `answer_query()` takes `enforce_threshold`
+(default `True`) so the same code path can reproduce the naive pre-fix
+behavior (`enforce_threshold=False`, or `--no-threshold` on the CLI) for the
+failure demo, rather than maintaining two separate implementations.
+
+Verified without an API key: calling `answer_query()` on the off-topic query
+(similarity 0.024, well under the 0.30 threshold) returns
+`refused=True` and the fixed message, with **no Anthropic API call made at
+all** (confirmed — no auth error, meaning `generate_report()` never ran).
+
+Not yet verified: the actual LLM call path (on-topic query, and the
+`--no-threshold` naive/off-topic path that's supposed to demonstrate the
+forced-synthesis failure) — blocked on `ANTHROPIC_API_KEY` being available.

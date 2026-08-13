@@ -2,18 +2,30 @@
 produce a short synthesized report with inline citations back to the
 numbered source papers.
 
-NOTE: this is the naive (pre-fix) version, used deliberately to run the
-failure demo first. It always calls the LLM regardless of how weak the
-retrieved similarity scores are - see demo/AGENTS.md for what this produces
-on an off-topic query, and src/generation/AGENTS.md for why Fix 1 gets added
-after that demo runs.
+Fix 1 (relevance confidence threshold) lives here: answer_query() checks
+src.retrieval.retrieve.passes_relevance_threshold() before ever calling the
+LLM, and returns a fixed refusal message instead of forcing a synthesis when
+nothing in the top-k pool is a genuine match. Pass enforce_threshold=False
+(or --no-threshold on the CLI) to reproduce the naive, pre-fix behavior for
+the failure demo - same code path, one parameter, so the demo isolates
+exactly what Fix 1 changes rather than comparing two different
+implementations.
+
+Fix 2 (citation-weighted reranking) is applied optionally via use_rerank /
+--rerank, using src.rerank.rerank.blend_scores() on the retrieved pool
+before generation.
 
 Run as: python -m src.generation.generate "<query>"
 """
 import anthropic
 
-from src.config import ANTHROPIC_MODEL, DEFAULT_TOP_K
-from src.retrieval.retrieve import rank
+from src.config import ANTHROPIC_MODEL, DEFAULT_TOP_K, SIMILARITY_THRESHOLD
+from src.retrieval.retrieve import passes_relevance_threshold, rank
+
+NO_RELEVANT_PAPERS_MESSAGE = (
+    "No sufficiently relevant papers found in the corpus for this query "
+    "(top similarity score did not clear the {threshold:.2f} confidence threshold)."
+)
 
 
 def _format_context(papers: list[dict]) -> str:
@@ -54,10 +66,36 @@ def generate_report(query: str, papers: list[dict]) -> str:
     return "".join(block.text for block in response.content if block.type == "text")
 
 
-def answer_query(query: str, top_k: int = DEFAULT_TOP_K) -> dict:
-    papers = rank(query, top_k=top_k)
-    report = generate_report(query, papers)
-    return {"query": query, "papers": papers, "report": report}
+def answer_query(
+    query: str,
+    top_k: int = DEFAULT_TOP_K,
+    threshold: float = SIMILARITY_THRESHOLD,
+    use_rerank: bool = False,
+    enforce_threshold: bool = True,
+) -> dict:
+    """Retrieve, optionally rerank (Fix 2), optionally gate on relevance
+    (Fix 1), then generate. The threshold check runs against the raw
+    similarity-sorted ranking (not the reranked order) - it's asking "is
+    there any genuine match at all", which is a property of the retrieval
+    scores, not of how the pool gets reordered afterward.
+    """
+    ranked = rank(query, top_k=top_k)
+
+    if enforce_threshold and not passes_relevance_threshold(ranked, threshold=threshold):
+        return {
+            "query": query,
+            "papers": ranked,
+            "report": NO_RELEVANT_PAPERS_MESSAGE.format(threshold=threshold),
+            "refused": True,
+        }
+
+    papers_for_generation = ranked
+    if use_rerank:
+        from src.rerank.rerank import blend_scores
+        papers_for_generation = blend_scores(ranked)
+
+    report = generate_report(query, papers_for_generation)
+    return {"query": query, "papers": papers_for_generation, "report": report, "refused": False}
 
 
 def main():
@@ -66,11 +104,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("query")
     parser.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)
+    parser.add_argument("--threshold", type=float, default=SIMILARITY_THRESHOLD)
+    parser.add_argument("--rerank", action="store_true", help="Apply Fix 2 citation-weighted reranking before generation")
+    parser.add_argument("--no-threshold", action="store_true", help="Disable Fix 1 (reproduce naive pre-fix behavior)")
     args = parser.parse_args()
 
-    result = answer_query(args.query, top_k=args.top_k)
+    result = answer_query(
+        args.query,
+        top_k=args.top_k,
+        threshold=args.threshold,
+        use_rerank=args.rerank,
+        enforce_threshold=not args.no_threshold,
+    )
     print(f"Query: {result['query']}\n")
-    print(f"Top similarity: {result['papers'][0]['similarity']:.3f}\n")
+    if result["papers"]:
+        print(f"Top similarity: {result['papers'][0]['similarity']:.3f}\n")
     print(result["report"])
 
 

@@ -88,14 +88,26 @@ as the "can it be implemented" demonstration plus a proposed improvement.
       cosine similarity, configurable top-k. Calibrated against real
       on-topic (0.396-0.567) vs. off-topic (-0.034-0.024) similarity scores
       — see `src/retrieval/AGENTS.md`.
-- [ ] Generation (`src/generation/generate.py`): top-k context → Claude →
-      short report with inline citations.
-- [ ] Failure demo run (naive pipeline, no fixes yet): on-topic query vs.
-      off-topic query, showing the off-topic case forces a misleading answer.
-- [ ] Fix 1 (relevance confidence threshold) implemented and demo re-run.
-- [ ] Fix 2 (citation-weighted reranking) implemented and demo re-run.
+- [x] Generation (`src/generation/generate.py`): top-k context → Claude →
+      short report with inline citations. Implemented with **Fix 1 built in**
+      as a togglable gate (`enforce_threshold`, default `True`) rather than
+      as a separate naive version — see `src/generation/AGENTS.md`.
+- [x] Fix 1 (relevance confidence threshold) implemented. Verified without
+      an API key: the off-topic query is refused before any LLM call is made
+      (`refused=True`, zero Anthropic API calls). On-topic verification and
+      the naive-vs-fixed report comparison still need a live run.
+- [x] Fix 2 (citation-weighted reranking, `src/rerank/rerank.py`)
+      implemented and verified standalone (no LLM needed) — the 16,973-
+      citation seminal paper moves from rank 6 (pure similarity) to rank 2
+      (blended) on the on-topic query. See `src/rerank/AGENTS.md`.
+- [x] `demo/run_demo.py` orchestration script written.
+- [ ] **Blocked on `ANTHROPIC_API_KEY`**: the failure demo's actual LLM-
+      generated report text — naive pipeline (forced synthesis on the
+      off-topic query), Fix 1 alone, and Fix 1 + Fix 2 — needs a live run to
+      capture and compare. Everything that *doesn't* require a live model
+      call has already been verified (see above).
 - [ ] Final AGENTS.md pass + consolidated failure-modes/tradeoffs notes for
-      the report.
+      the report, once the live demo output is in.
 
 ## Known design tradeoffs (updated as they're discovered)
 
@@ -110,5 +122,8 @@ detail behind each line once filled in.
 - Similarity threshold calibration (`0.30`, picked from a real ~0.37-wide
   observed gap between on-topic and off-topic scores on this corpus — not a
   universal constant): see `src/retrieval/AGENTS.md`.
-- Citation/similarity normalization for blending: *(pending — filled in when
-  `src/rerank/` is built)*
+- Citation/similarity normalization for blending (log1p on citation counts,
+  both signals min-max normalized *within the retrieved pool*, not globally
+  — relative rather than absolute calibration): see `src/rerank/AGENTS.md`.
+- Fix 1 as a togglable gate rather than a separate naive implementation
+  (`enforce_threshold` parameter): see `src/generation/AGENTS.md`.
