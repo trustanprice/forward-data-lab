@@ -598,6 +598,259 @@
     font-family: var(--font-mono);
   }
 
+  /* ---------- interactive console ---------- */
+
+  .console { padding: 30px 32px 34px; }
+
+  .console__controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px;
+    padding-bottom: 26px;
+    margin-bottom: 26px;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  @media (max-width: 780px) {
+    .console__controls { grid-template-columns: 1fr; }
+  }
+
+  .control-group { display: flex; flex-direction: column; gap: 10px; }
+
+  .control-group__label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink-2);
+  }
+
+  .segmented {
+    display: inline-flex;
+    padding: 3px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 11px;
+    gap: 2px;
+    width: fit-content;
+  }
+
+  .segmented__btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 560;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  .segmented__btn:hover { color: var(--ink-0); }
+  .segmented__btn:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+  .segmented__btn.is-active { background: var(--accent); color: #0c0a16; }
+
+  .switch { display: inline-flex; align-items: center; cursor: pointer; width: fit-content; position: relative; }
+  .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+
+  .switch__track {
+    width: 42px;
+    height: 25px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid var(--glass-border);
+    position: relative;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .switch__thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 19px; height: 19px;
+    border-radius: 50%;
+    background: var(--ink-1);
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+
+  .switch input:checked + .switch__track { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + .switch__track .switch__thumb { transform: translateX(17px); background: #0c0a16; }
+  .switch input:focus-visible + .switch__track { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+  .slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent) var(--fill, 50%), rgba(255, 255, 255, 0.12) var(--fill, 50%), rgba(255, 255, 255, 0.12) 100%);
+    outline: none;
+    margin-top: 4px;
+  }
+
+  .slider:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 4px; }
+
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 17px; height: 17px;
+    border-radius: 50%;
+    background: var(--ink-0);
+    border: 3px solid var(--accent);
+    cursor: pointer;
+  }
+
+  .slider::-moz-range-thumb {
+    width: 17px; height: 17px;
+    border-radius: 50%;
+    background: var(--ink-0);
+    border: 3px solid var(--accent);
+    cursor: pointer;
+  }
+
+  .slider__endcaps {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: var(--ink-3);
+    margin-top: 2px;
+  }
+
+  .console__query-display {
+    font-size: 13px;
+    color: var(--ink-2);
+    margin: 0 0 14px;
+  }
+
+  .console__query-display b { color: var(--ink-0); font-weight: 560; }
+
+  .paper-ledger {
+    list-style: none;
+    margin: 0 0 20px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ledger-item {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) 78px 92px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid transparent;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+
+  @media (max-width: 640px) {
+    .ledger-item { grid-template-columns: 20px minmax(0, 1fr) 66px; }
+    .ledger-item__cite { display: none; }
+  }
+
+  .ledger-item--top { background: var(--accent-wash); border-color: rgba(141, 126, 247, 0.28); }
+
+  .ledger-item__n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink-3); }
+  .ledger-item--top .ledger-item__n { color: var(--accent-strong); }
+
+  .ledger-item__t { font-size: 13px; color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ledger-item--top .ledger-item__t { color: var(--ink-0); font-weight: 560; }
+
+  .ledger-item__sim, .ledger-item__cite {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
+    color: var(--ink-2);
+    text-align: right;
+  }
+
+  .verdict {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    font-weight: 560;
+    margin-bottom: 20px;
+  }
+
+  .verdict::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .verdict--go { background: var(--success-wash); color: var(--success); }
+  .verdict--go::before { background: var(--success); }
+
+  .verdict--stop { background: var(--accent-wash); color: var(--accent-strong); }
+  .verdict--stop::before { background: var(--accent); }
+
+  .explain-panel {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed var(--glass-border-strong);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+
+  .explain-panel__label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    margin: 0 0 8px;
+  }
+
+  .explain-panel p:last-child { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-1); }
+
+  .explain-panel code {
+    font-family: var(--font-mono);
+    color: var(--accent-strong);
+    background: rgba(141, 126, 247, 0.1);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.92em;
+  }
+
+  .reveal-btn {
+    appearance: none;
+    margin-top: 20px;
+    padding: 12px 20px;
+    border-radius: 11px;
+    border: 1px solid rgba(141, 126, 247, 0.35);
+    background: var(--accent-wash);
+    color: var(--accent-strong);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+
+  .reveal-btn:hover { background: rgba(141, 126, 247, 0.22); transform: translateY(-1px); }
+  .reveal-btn:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 3px; }
+
+  .report-reveal {
+    margin-top: 20px;
+    padding: 22px 24px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+  }
+
+  .report-reveal__label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    margin: 0 0 12px;
+    line-height: 1.5;
+  }
+
+  .report-reveal__text { font-size: 14px; line-height: 1.68; color: var(--ink-1); white-space: pre-wrap; }
+
   /* ---------- reveal on scroll ---------- */
 
   .reveal {
@@ -648,6 +901,55 @@
     </div>
 
     <p class="provenance-note">Everything below is real, live-run output against Claude Opus 5 — not placeholder copy. Source: <code style="font-family: var(--font-mono); background: none; border: none; padding: 0; display: inline;">demo/sample_output_naive.json</code> and <code style="font-family: var(--font-mono); background: none; border: none; padding: 0; display: inline;">demo/AGENTS.md</code>.</p>
+  </section>
+
+  <section id="console">
+    <div class="eyebrow">Interactive — computed live, in your browser</div>
+    <h2>Run it yourself</h2>
+    <p class="lede">Not a recording. The threshold check and the citation blend below execute right here, on the same real similarity scores and citation counts the pipeline produced. Flip the switches — the numbers actually move.</p>
+
+    <div class="glass console reveal">
+      <div class="console__controls">
+        <div class="control-group">
+          <span class="control-group__label">Query</span>
+          <div class="segmented" id="query-toggle" role="group" aria-label="Select query">
+            <button class="segmented__btn is-active" data-query="on_topic" type="button">On-topic</button>
+            <button class="segmented__btn" data-query="off_topic" type="button">Off-topic</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <span class="control-group__label">Fix 1 — relevance threshold</span>
+          <label class="switch">
+            <input type="checkbox" id="fix1-toggle" checked>
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+          </label>
+        </div>
+        <div class="control-group">
+          <span class="control-group__label">Fix 2 — citation rerank<span id="alpha-inline"></span></span>
+          <label class="switch">
+            <input type="checkbox" id="fix2-toggle">
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+          </label>
+          <input type="range" id="alpha-slider" min="0" max="1" step="0.05" value="0.5" class="slider" hidden>
+          <div class="slider__endcaps" id="alpha-endcaps" hidden><span>favor citations</span><span>favor similarity</span></div>
+        </div>
+      </div>
+
+      <p class="console__query-display" id="active-query"></p>
+      <ol class="paper-ledger" id="paper-ledger"></ol>
+      <div class="verdict" id="verdict"></div>
+
+      <div class="explain-panel">
+        <p class="explain-panel__label">What that click just did</p>
+        <p id="explain-text"></p>
+      </div>
+
+      <button class="reveal-btn" id="reveal-report-btn" type="button" hidden>Reveal the generated report →</button>
+      <div class="report-reveal" id="report-reveal" hidden>
+        <p class="report-reveal__label" id="report-reveal-label"></p>
+        <div class="report-reveal__text" id="report-reveal-text"></div>
+      </div>
+    </div>
   </section>
 
   <section id="surprise">
@@ -793,12 +1095,231 @@ threshold:  0.30</code>
 </main>
 
 <script>
-  (function () {
-    var els = document.querySelectorAll('.reveal');
-    if (!('IntersectionObserver' in window)) {
-      els.forEach(function (el) { el.classList.add('is-visible'); });
-      return;
+(function () {
+  var DATA = {
+    on_topic: {
+      query: "How does retrieval-augmented generation reduce hallucinations in large language models?",
+      papers: [
+        { title: "Benchmarking Retrieval-Augmented Generation for Medicine", similarity: 0.5667269229888916, citations: 588 },
+        { title: "RAG for large language models in healthcare: A systematic review", similarity: 0.5096324682235718, citations: 211 },
+        { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: 0.5021803975105286, citations: 909 },
+        { title: "Improving LLM applications in biomedicine with RAG", similarity: 0.4989597797393799, citations: 163 },
+        { title: "Retrieval-Augmented Generation for Large Language Models: A Survey", similarity: 0.4652036428451538, citations: 3837 },
+        { title: "RAG for Knowledge-Intensive NLP Tasks (2020)", similarity: 0.42475178837776184, citations: 16973 },
+        { title: "MultiHop-RAG: Benchmarking RAG for Multi-Hop Queries", similarity: 0.40638118982315063, citations: 314 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for RAG", similarity: 0.39639046788215637, citations: 76 }
+      ],
+      report: "# How Retrieval-Augmented Generation Reduces Hallucinations in LLMs\n\n## Core Mechanism\n\nRAG addresses hallucination by supplementing an LLM's parametric memory with explicit, non-parametric external knowledge that is retrieved at inference time and used to condition generation [5][6]. The original formulation combined a pre-trained seq2seq generator with a dense vector index of Wikipedia accessed via a neural retriever, and showed that such models produce \"more specific, diverse and factual language\" than a parametric-only baseline [6]. By grounding outputs in a reference textual database, RAG reduces the risk that the model fabricates content, while also improving credibility, traceability of provenance, and the ability to update knowledge without retraining [3][5][6]. This directly targets three linked weaknesses of standalone LLMs: hallucination, outdated training data, and non-transparent reasoning [5][2].\n\n## Empirical Evidence\n\nIn medicine, RAG systems improved accuracy for six LLMs by up to 18% over chain-of-thought prompting, raising GPT-3.5 and Mixtral to GPT-4-level performance, with the best results from combining multiple corpora and retrievers [1]. A meta-analysis of biomedical studies found a pooled odds ratio of 1.35 (95% CI 1.19–1.53) favoring RAG over baseline LLMs [4].\n\n## Limits and Caveats\n\nReduction is not elimination: faithfulness depends on both retrieving relevant passages and the LLM actually exploiting them, which is why reference-free metrics decompose these dimensions [3]. Known failure modes include \"lost-in-the-middle\" effects [1], poor performance on multi-hop queries requiring reasoning over several evidence pieces [7], and difficulty with later conversational turns and unanswerable questions [8]. Healthcare reviews also note the absence of standardized evaluation frameworks [2]."
+    },
+    off_topic: {
+      query: "What are the effects of ocean acidification on coral reef ecosystems?",
+      papers: [
+        { title: "Improving LLM applications in biomedicine with RAG", similarity: 0.023568887263536453, citations: 163 },
+        { title: "PoisonedRAG: Knowledge Corruption Attacks to RAG of LLMs", similarity: -0.0033609718084335327, citations: 268 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for RAG", similarity: -0.014370199292898178, citations: 76 },
+        { title: "G-Retriever: RAG for Textual Graph Understanding and QA", similarity: -0.021786121651530266, citations: 335 },
+        { title: "ViDoRAG: Visual Document RAG via Dynamic Iterative Reasoning", similarity: -0.024366572499275208, citations: 69 },
+        { title: "RAG for Knowledge-Intensive NLP Tasks (2020)", similarity: -0.029770707711577415, citations: 16973 },
+        { title: "Agentic Retrieval-Augmented Generation: A Survey", similarity: -0.031780023127794266, citations: 383 },
+        { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: -0.033591434359550476, citations: 909 }
+      ],
+      report: "The provided abstracts do not support an answer to this query. All eight sources concern retrieval-augmented generation (RAG) and large language models in natural language processing — covering foundational RAG methods [6], evaluation frameworks and benchmarks [3], [8], graph- and vision-based RAG variants [4], [5], agentic RAG architectures [7], security vulnerabilities such as knowledge-corruption attacks [2], and biomedical/clinical applications [1]. None of them address ocean acidification, coral reefs, marine biology, or any environmental science topic. To answer your question, you would need a different set of sources drawn from marine or climate science literature."
     }
+  };
+
+  var THRESHOLD = 0.30;
+  var state = { query: 'on_topic', fix1: true, fix2: false, alpha: 0.5 };
+
+  function log1p(x) { return Math.log(1 + x); }
+
+  function minMax(vals) {
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    if (hi === lo) return vals.map(function () { return 1; });
+    return vals.map(function (v) { return (v - lo) / (hi - lo); });
+  }
+
+  // Mirrors src/rerank/rerank.py's blend_scores() exactly: log1p citation
+  // counts, min-max normalize both signals within this pool, blend by alpha.
+  function blend(papers, alpha) {
+    var logCites = papers.map(function (p) { return log1p(p.citations); });
+    var normSim = minMax(papers.map(function (p) { return p.similarity; }));
+    var normCite = minMax(logCites);
+    return papers.map(function (p, i) {
+      var copy = {};
+      for (var k in p) copy[k] = p[k];
+      copy.normSim = normSim[i];
+      copy.normCite = normCite[i];
+      copy.blended = alpha * normSim[i] + (1 - alpha) * normCite[i];
+      return copy;
+    }).sort(function (a, b) { return b.blended - a.blended; });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function formatReport(text) {
+    var t = escapeHtml(text);
+    t = t.replace(/^## (.+)$/gm, '<strong style="color:var(--ink-0);display:block;margin-top:14px;">$1</strong>');
+    t = t.replace(/^# (.+)$/gm, '<strong style="color:var(--ink-0);display:block;font-size:1.05em;margin-bottom:4px;">$1</strong>');
+    t = t.replace(/\[(\d+)\]/g, '<span style="color:var(--accent-strong);font-size:0.82em;vertical-align:super;">[$1]</span>');
+    return t;
+  }
+
+  var els = {
+    queryToggle: document.getElementById('query-toggle'),
+    fix1Toggle: document.getElementById('fix1-toggle'),
+    fix2Toggle: document.getElementById('fix2-toggle'),
+    alphaSlider: document.getElementById('alpha-slider'),
+    alphaEndcaps: document.getElementById('alpha-endcaps'),
+    alphaInline: document.getElementById('alpha-inline'),
+    activeQuery: document.getElementById('active-query'),
+    ledger: document.getElementById('paper-ledger'),
+    verdict: document.getElementById('verdict'),
+    explainText: document.getElementById('explain-text'),
+    revealBtn: document.getElementById('reveal-report-btn'),
+    reportReveal: document.getElementById('report-reveal'),
+    reportLabel: document.getElementById('report-reveal-label'),
+    reportText: document.getElementById('report-reveal-text')
+  };
+
+  function explainText(ctx, changedWhat) {
+    var q = state.query === 'on_topic' ? 'on-topic' : 'off-topic';
+    if (changedWhat === 'fix1') {
+      if (!state.fix1) {
+        return 'Fix 1 disabled &mdash; the pipeline will call the model regardless of similarity (the naive, pre-fix behavior). Top similarity <code>' + ctx.topSim.toFixed(3) + '</code> is no longer checked against anything.';
+      }
+      return ctx.refused
+        ? 'Fix 1 enabled: <code>' + ctx.topSim.toFixed(3) + ' &lt; ' + THRESHOLD.toFixed(2) + '</code> &rarr; refused before any API call.'
+        : 'Fix 1 enabled: <code>' + ctx.topSim.toFixed(3) + ' ≥ ' + THRESHOLD.toFixed(2) + '</code> &rarr; proceeds to generation.';
+    }
+    if (changedWhat === 'fix2') {
+      if (!state.fix2) return 'Fix 2 disabled &mdash; the ledger above is sorted by raw embedding similarity only.';
+      var top = ctx.display[0];
+      return 'Fix 2 enabled at <code>α = ' + state.alpha.toFixed(2) + '</code>: "' + top.title + '" now ranks #1 &mdash; blended <code>' + top.blended.toFixed(3) + ' = ' + state.alpha.toFixed(2) + ' × sim(' + top.normSim.toFixed(3) + ') + ' + (1 - state.alpha).toFixed(2) + ' × cites(' + top.normCite.toFixed(3) + ')</code>.';
+    }
+    if (changedWhat === 'alpha') {
+      var top2 = ctx.display[0];
+      return '<code>α = ' + state.alpha.toFixed(2) + '</code> &mdash; blend recomputed live for all 8 papers. Current #1: "' + top2.title + '" at <code>' + top2.blended.toFixed(3) + '</code>.';
+    }
+    if (changedWhat === 'query') {
+      return 'Switched to the <b style="color:var(--ink-0)">' + q + '</b> query &mdash; same 18-paper corpus, same embedding model, same code path, only the query text changed. Top similarity is now <code>' + ctx.topSim.toFixed(3) + '</code>.';
+    }
+    return 'Toggle a control above to watch the pipeline recompute in real time, on the real numbers.';
+  }
+
+  function render(changedWhat) {
+    var d = DATA[state.query];
+    var raw = d.papers;
+    var topSim = raw[0].similarity;
+    var refused = state.fix1 && topSim < THRESHOLD;
+    var display = (state.fix2 && !refused) ? blend(raw, state.alpha) : raw;
+
+    // reset any open report reveal on every interaction - it belongs to
+    // whatever state was active when it was opened, not the new one
+    els.reportReveal.hidden = true;
+    els.revealBtn.textContent = 'Reveal the generated report →';
+
+    // FLIP animation: capture pre-render positions keyed by title
+    var oldRects = {};
+    Array.prototype.forEach.call(els.ledger.children, function (li) {
+      oldRects[li.dataset.title] = li.getBoundingClientRect();
+    });
+
+    els.activeQuery.innerHTML = 'Active query: <b>“' + escapeHtml(d.query) + '”</b>';
+
+    els.ledger.innerHTML = display.map(function (p, i) {
+      var isTop = i === 0;
+      var showBlend = state.fix2 && !refused;
+      var simDisplay = showBlend ? p.blended.toFixed(3) : p.similarity.toFixed(3);
+      var simLabel = showBlend ? 'blend' : 'sim';
+      return '<li class="ledger-item' + (isTop ? ' ledger-item--top' : '') + '" data-title="' + escapeHtml(p.title) + '">' +
+        '<span class="ledger-item__n">' + (i + 1) + '</span>' +
+        '<span class="ledger-item__t">' + escapeHtml(p.title) + '</span>' +
+        '<span class="ledger-item__sim">' + simLabel + ' ' + simDisplay + '</span>' +
+        '<span class="ledger-item__cite">' + p.citations.toLocaleString() + ' cites</span>' +
+        '</li>';
+    }).join('');
+
+    Array.prototype.forEach.call(els.ledger.children, function (li) {
+      var oldRect = oldRects[li.dataset.title];
+      if (!oldRect) return;
+      var newRect = li.getBoundingClientRect();
+      var dy = oldRect.top - newRect.top;
+      if (Math.abs(dy) < 1) return;
+      li.style.transition = 'none';
+      li.style.transform = 'translateY(' + dy + 'px)';
+      requestAnimationFrame(function () {
+        li.style.transition = 'transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        li.style.transform = '';
+      });
+    });
+
+    if (refused) {
+      els.verdict.className = 'verdict verdict--stop';
+      els.verdict.textContent = 'Refused — top similarity ' + topSim.toFixed(3) + ' < threshold ' + THRESHOLD.toFixed(2) + '. No API call made.';
+      els.revealBtn.hidden = true;
+    } else {
+      els.verdict.className = 'verdict verdict--go';
+      els.verdict.textContent = state.fix1
+        ? 'Proceeds — top similarity ' + topSim.toFixed(3) + ' ≥ threshold ' + THRESHOLD.toFixed(2) + '.'
+        : 'Proceeds — Fix 1 disabled, similarity not checked.';
+      els.revealBtn.hidden = false;
+    }
+
+    els.alphaInline.textContent = state.fix2 ? ' (α ' + state.alpha.toFixed(2) + ')' : '';
+    els.alphaSlider.hidden = !state.fix2;
+    els.alphaEndcaps.hidden = !state.fix2;
+    els.alphaSlider.style.setProperty('--fill', (state.alpha * 100) + '%');
+
+    els.explainText.innerHTML = explainText({ topSim: topSim, refused: refused, display: display }, changedWhat);
+  }
+
+  els.queryToggle.addEventListener('click', function (e) {
+    var btn = e.target.closest('.segmented__btn');
+    if (!btn) return;
+    Array.prototype.forEach.call(els.queryToggle.children, function (b) { b.classList.remove('is-active'); });
+    btn.classList.add('is-active');
+    state.query = btn.dataset.query;
+    render('query');
+  });
+
+  els.fix1Toggle.addEventListener('change', function () {
+    state.fix1 = els.fix1Toggle.checked;
+    render('fix1');
+  });
+
+  els.fix2Toggle.addEventListener('change', function () {
+    state.fix2 = els.fix2Toggle.checked;
+    render('fix2');
+  });
+
+  els.alphaSlider.addEventListener('input', function () {
+    state.alpha = parseFloat(els.alphaSlider.value);
+    render('alpha');
+  });
+
+  els.revealBtn.addEventListener('click', function () {
+    var d = DATA[state.query];
+    var isHidden = els.reportReveal.hidden;
+    if (isHidden) {
+      els.reportLabel.textContent = 'Captured live against claude-opus-5, 2026-08-13 — replayed verbatim. This is the real non-reranked transcript for this query; a static page can’t safely hold a live API key to re-call it for every blend weight.';
+      els.reportText.innerHTML = formatReport(d.report);
+      els.reportReveal.hidden = false;
+      els.revealBtn.textContent = 'Hide the generated report ↑';
+    } else {
+      els.reportReveal.hidden = true;
+      els.revealBtn.textContent = 'Reveal the generated report →';
+    }
+  });
+
+  render();
+
+  // ---------- reveal on scroll ----------
+  var revealEls = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) {
+    Array.prototype.forEach.call(revealEls, function (el) { el.classList.add('is-visible'); });
+  } else {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
@@ -807,6 +1328,7 @@ threshold:  0.30</code>
         }
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-    els.forEach(function (el) { io.observe(el); });
-  })();
+    Array.prototype.forEach.call(revealEls, function (el) { io.observe(el); });
+  }
+})();
 </script>
