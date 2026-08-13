@@ -13,7 +13,10 @@ build step, and no runtime dependency on the rest of the repo.
 ## Inputs
 
 - `demo/sample_output_naive.json` — exact query text, similarity scores,
-  and generated report text for the naive on-topic/off-topic run.
+  and generated report text for the original naive on-topic/off-topic run.
+- `demo/sample_output_extended.json` — the same, for 4 additional queries
+  (2 on-topic, 2 off-topic) run to check the naive-decline finding wasn't a
+  fluke — see `demo/AGENTS.md` § Replication.
 - `demo/AGENTS.md` — the Fix 1 / Fix 2 / rerank findings (refusal message,
   rank-shift table, the `top_k=5` exclusion result, the narrative-emphasis
   observation) that `demo/sample_output_naive.json` alone doesn't capture
@@ -60,18 +63,28 @@ build step, and no runtime dependency on the rest of the repo.
   `topSimilarity >= 0.30` check) and `src/rerank/rerank.py`'s
   `blend_scores()` (log1p citation counts, min-max normalize both signals
   within the pool, `alpha * norm_sim + (1-alpha) * norm_citation`) against
-  the real per-paper similarity/citation numbers for both queries, embedded
-  as a JS data object transcribed from `demo/sample_output_naive.json`.
-  Dragging the alpha slider or toggling Fix 1/Fix 2 recomputes and
-  re-renders (with a FLIP reorder animation) on every input — nothing is
-  precomputed per combination. The one thing that is **not** live is the
-  LLM generation step itself: the "reveal report" button replays the real,
-  verbatim Claude Opus 5 transcript captured on 2026-08-13, clearly labeled
-  as such, since a static page cannot safely hold a live API key to make a
-  fresh call per query/blend combination. If the underlying data changes
-  (demo re-run, threshold recalibrated), **both** the narrative sections
-  below and this JS `DATA` object need manual re-sync — they are not a
-  single source of truth.
+  real per-paper similarity/citation numbers for **6 queries** (3 on-topic,
+  3 off-topic — `DATA.on_topic[]` / `DATA.off_topic[]`, each an array of
+  `{label, query, papers, report}`), transcribed from
+  `demo/sample_output_naive.json` (2 queries) and
+  `demo/sample_output_extended.json` (4 queries). The console UI is a
+  category segmented-control (on/off-topic) plus a `query-picker` row of
+  pills that repopulates for whichever category is active — `state = 
+  {category, index, fix1, fix2, alpha}`, `currentEntry()` resolves
+  `DATA[state.category][state.index]`. Dragging the alpha slider or
+  toggling any control recomputes and re-renders (with a FLIP reorder
+  animation) on every input — nothing is precomputed per combination. The
+  one thing that is **not** live is the LLM generation step itself: the
+  "reveal report" button replays the real, verbatim Claude Opus 5
+  transcript captured on 2026-08-13 for whichever of the 6 queries is
+  selected, clearly labeled as such, since a static page cannot safely hold
+  a live API key to make a fresh call per query/blend combination. If the
+  underlying data changes (demo re-run, threshold recalibrated), **both**
+  the narrative sections below and this JS `DATA` object need manual
+  re-sync — they are not a single source of truth.
+- Name/school/personality appear in exactly 2 places, both grounded in the
+  author's actual background (not invented): a byline under the hero
+  subtitle (`hero__byline`), and a footer credit line (`footer__name`).
 
 ## Current state
 
@@ -80,21 +93,28 @@ Built and published as a Claude Artifact
 Covers all five narrative sections from the original brief (hero/intro,
 naive-pipeline honest surprise, Fix 1, Fix 2 with its two documented
 limitations, conclusion), an interactive "Run it yourself" console inserted
-right after the hero (see the convention above for exactly what it computes
-live vs. replays verbatim), and a "Questions I Asked" accordion
-(`#questions`, five items) inserted right before the conclusion — five
-real design-review exchanges, condensed but faithful: whether the off-topic
-query is really about citation count (no — retrieval never sees citations),
-whether Fix 1 improves retrieval (no — it's a post-retrieval trust gate),
-whether Fix 2 runs after generation (no — both fixes finish before the LLM
-is ever called), what alpha should be set to and how to use it
-strategically, and whether the similarity threshold should adapt lower for
-under-covered/emerging topics (argued no, and why — circularity plus the
-worse failure mode). Accordion uses a CSS grid-template-rows 0fr→1fr
-transition for smooth open/close with no JS height measuring.
+right after the hero — now covering **6 real queries (3 on-topic, 3
+off-topic)** via a category toggle + query-picker, all 3 off-topic queries
+independently confirmed to decline honestly (see the convention above for
+exactly what it computes live vs. replays verbatim) — and a "Questions I
+Asked" accordion (`#questions`, five items) inserted right before the
+conclusion: five real design-review exchanges, condensed but faithful,
+covering whether the off-topic query is really about citation count,
+whether Fix 1 improves retrieval, whether Fix 2 runs after generation, what
+alpha should be set to and how to use it strategically, and whether the
+similarity threshold should adapt lower for under-covered/emerging topics.
+Accordion uses a CSS grid-template-rows 0fr→1fr transition for smooth
+open/close with no JS height measuring.
+
+Byline (hero) and footer credit name Trustan Price and University of
+Illinois Urbana-Champaign, with the hero byline tying the project's
+verify-before-trusting thesis to two real resume facts (a 100%-audit-
+coverage push at Caterpillar, a failure-detection model for NBA
+predictions) — sourced from the author's own CV, not invented.
 
 All numbers and quotes are transcribed from the live run or the actual
-conversation, not invented. Verified: JS syntax-checked clean, every
-element ID referenced by the script exists exactly once in the markup,
-section tags balanced, file confirmed UTF-8 with the charset meta tag as
-the first byte.
+conversation, not invented. Verified: JS syntax-checked clean (including a
+Node-executed simulation confirming all 6 queries produce the correct
+Fix 1 gate decision), every element ID referenced by the script exists
+exactly once in the markup, section tags balanced, file confirmed UTF-8
+with the charset meta tag as the first byte.

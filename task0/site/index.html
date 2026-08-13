@@ -211,8 +211,20 @@
     color: var(--ink-1);
     max-width: 58ch;
     line-height: 1.6;
-    margin: 0 0 56px;
+    margin: 0 0 22px;
   }
+
+  .hero__byline {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    max-width: 60ch;
+    line-height: 1.6;
+    margin: 0 0 44px;
+    padding-left: 14px;
+    border-left: 2px solid rgba(141, 126, 247, 0.3);
+  }
+
+  .hero__byline b { color: var(--ink-0); font-weight: 600; }
 
   .beats {
     display: grid;
@@ -596,6 +608,15 @@
     font-size: 12.5px;
     color: var(--ink-3);
     font-family: var(--font-mono);
+    margin: 0 0 6px;
+  }
+
+  footer p:last-child { margin-bottom: 0; }
+
+  footer .footer__name {
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--ink-2);
   }
 
   /* ---------- interactive console ---------- */
@@ -715,6 +736,36 @@
     font-size: 10.5px;
     color: var(--ink-3);
     margin-top: 2px;
+  }
+
+  .query-picker {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .query-pill {
+    appearance: none;
+    padding: 8px 15px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink-2);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 560;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  }
+
+  .query-pill:hover { color: var(--ink-0); border-color: var(--glass-border-strong); }
+  .query-pill:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+  .query-pill.is-active {
+    background: var(--accent-wash);
+    border-color: rgba(141, 126, 247, 0.4);
+    color: var(--accent-strong);
   }
 
   .console__query-display {
@@ -940,6 +991,8 @@
     <h1>The evidence was already there. Nothing used it.</h1>
     <p class="hero__sub">I tested Asta against Google Scholar on a real research question, found a specific gap in how it weighs evidence, then built a minimal version of its pipeline — small enough to fully inspect — and ran it live to see whether the gap actually shows up.</p>
 
+    <p class="hero__byline">By <b>Trustan Price</b>, University of Illinois Urbana-Champaign — built with the same instinct that shaped a 100%-audit-coverage push at Caterpillar and a failure-detection model for NBA predictions: don't trust a pipeline until you've verified what it's actually doing.</p>
+
     <div class="beats">
       <div class="glass beat reveal">
         <div class="beat__traffic"><span></span><span></span><span></span></div>
@@ -972,15 +1025,15 @@
   <section id="console">
     <div class="eyebrow">Interactive — computed live, in your browser</div>
     <h2>Run it yourself</h2>
-    <p class="lede">Not a recording. The threshold check and the citation blend below execute right here, on the same real similarity scores and citation counts the pipeline produced. Flip the switches — the numbers actually move.</p>
+    <p class="lede">Not a recording. The threshold check and the citation blend below execute right here, on the same real similarity scores and citation counts the pipeline produced — across 3 on-topic and 3 off-topic queries, all run live against Claude Opus 5. All three off-topic queries got the same honest decline, in three completely unrelated domains. Flip the switches — the numbers actually move.</p>
 
     <div class="glass console reveal">
       <div class="console__controls">
         <div class="control-group">
-          <span class="control-group__label">Query</span>
-          <div class="segmented" id="query-toggle" role="group" aria-label="Select query">
-            <button class="segmented__btn is-active" data-query="on_topic" type="button">On-topic</button>
-            <button class="segmented__btn" data-query="off_topic" type="button">Off-topic</button>
+          <span class="control-group__label">Query category</span>
+          <div class="segmented" id="category-toggle" role="group" aria-label="Select query category">
+            <button class="segmented__btn is-active" data-category="on_topic" type="button">On-topic</button>
+            <button class="segmented__btn" data-category="off_topic" type="button">Off-topic</button>
           </div>
         </div>
         <div class="control-group">
@@ -1000,6 +1053,8 @@
           <div class="slider__endcaps" id="alpha-endcaps" hidden><span>favor citations</span><span>favor similarity</span></div>
         </div>
       </div>
+
+      <div class="query-picker" id="query-picker" role="group" aria-label="Select specific query"></div>
 
       <p class="console__query-display" id="active-query"></p>
       <ol class="paper-ledger" id="paper-ledger"></ol>
@@ -1228,6 +1283,7 @@ threshold:  0.30</code>
   </section>
 
   <footer>
+    <p class="footer__name">Trustan Price — University of Illinois Urbana-Champaign · Forward Data Lab, Task 1</p>
     <p>task0 / retrieval + rerank + generate — live run, claude-opus-5 — 2026-08-13</p>
   </footer>
 
@@ -1236,38 +1292,106 @@ threshold:  0.30</code>
 <script>
 (function () {
   var DATA = {
-    on_topic: {
+    on_topic: [
+      {
+      label: "Hallucinations",
       query: "How does retrieval-augmented generation reduce hallucinations in large language models?",
       papers: [
         { title: "Benchmarking Retrieval-Augmented Generation for Medicine", similarity: 0.5667269229888916, citations: 588 },
-        { title: "RAG for large language models in healthcare: A systematic review", similarity: 0.5096324682235718, citations: 211 },
+        { title: "Retrieval augmented generation for large language models in healthcare: A systematic review", similarity: 0.5096324682235718, citations: 211 },
         { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: 0.5021803975105286, citations: 909 },
-        { title: "Improving LLM applications in biomedicine with RAG", similarity: 0.4989597797393799, citations: 163 },
+        { title: "Improving large language model applications in biomedicine with retrieval-augmented generation: a systematic review, meta-analysis, and clinical development guidelines", similarity: 0.4989597797393799, citations: 163 },
         { title: "Retrieval-Augmented Generation for Large Language Models: A Survey", similarity: 0.4652036428451538, citations: 3837 },
-        { title: "RAG for Knowledge-Intensive NLP Tasks (2020)", similarity: 0.42475178837776184, citations: 16973 },
-        { title: "MultiHop-RAG: Benchmarking RAG for Multi-Hop Queries", similarity: 0.40638118982315063, citations: 314 },
-        { title: "MTRAG: A Multi-Turn Conversational Benchmark for RAG", similarity: 0.39639046788215637, citations: 76 }
+        { title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks", similarity: 0.42475178837776184, citations: 16973 },
+        { title: "MultiHop-RAG: Benchmarking Retrieval-Augmented Generation for Multi-Hop Queries", similarity: 0.40638118982315063, citations: 314 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for Evaluating Retrieval-Augmented Generation Systems", similarity: 0.39639046788215637, citations: 76 }
       ],
-      report: "# How Retrieval-Augmented Generation Reduces Hallucinations in LLMs\n\n## Core Mechanism\n\nRAG addresses hallucination by supplementing an LLM's parametric memory with explicit, non-parametric external knowledge that is retrieved at inference time and used to condition generation [5][6]. The original formulation combined a pre-trained seq2seq generator with a dense vector index of Wikipedia accessed via a neural retriever, and showed that such models produce \"more specific, diverse and factual language\" than a parametric-only baseline [6]. By grounding outputs in a reference textual database, RAG reduces the risk that the model fabricates content, while also improving credibility, traceability of provenance, and the ability to update knowledge without retraining [3][5][6]. This directly targets three linked weaknesses of standalone LLMs: hallucination, outdated training data, and non-transparent reasoning [5][2].\n\n## Empirical Evidence\n\nIn medicine, RAG systems improved accuracy for six LLMs by up to 18% over chain-of-thought prompting, raising GPT-3.5 and Mixtral to GPT-4-level performance, with the best results from combining multiple corpora and retrievers [1]. A meta-analysis of biomedical studies found a pooled odds ratio of 1.35 (95% CI 1.19–1.53) favoring RAG over baseline LLMs [4].\n\n## Limits and Caveats\n\nReduction is not elimination: faithfulness depends on both retrieving relevant passages and the LLM actually exploiting them, which is why reference-free metrics decompose these dimensions [3]. Known failure modes include \"lost-in-the-middle\" effects [1], poor performance on multi-hop queries requiring reasoning over several evidence pieces [7], and difficulty with later conversational turns and unanswerable questions [8]. Healthcare reviews also note the absence of standardized evaluation frameworks [2]."
+      report: "# How Retrieval-Augmented Generation Reduces Hallucinations in LLMs\n\n## Core Mechanism\n\nRAG addresses hallucination by supplementing an LLM's parametric memory with explicit, non-parametric external knowledge that is retrieved at inference time and used to condition generation [5][6]. The original formulation combined a pre-trained seq2seq generator with a dense vector index of Wikipedia accessed via a neural retriever, and showed that such models produce \"more specific, diverse and factual language\" than a parametric-only baseline [6]. By grounding outputs in a reference textual database, RAG reduces the risk that the model fabricates content, while also improving credibility, traceability of provenance, and the ability to update knowledge without retraining [3][5][6]. This directly targets three linked weaknesses of standalone LLMs: hallucination, outdated training data, and non-transparent reasoning [5][2].\n\n## Empirical Evidence\n\nIn medicine, RAG systems improved accuracy for six LLMs by up to 18% over chain-of-thought prompting, raising GPT-3.5 and Mixtral to GPT-4-level performance, with the best results from combining multiple corpora and retrievers [1]. A meta-analysis of biomedical studies found a pooled odds ratio of 1.35 (95% CI 1.19\u20131.53) favoring RAG over baseline LLMs [4].\n\n## Limits and Caveats\n\nReduction is not elimination: faithfulness depends on both retrieving relevant passages and the LLM actually exploiting them, which is why reference-free metrics decompose these dimensions [3]. Known failure modes include \"lost-in-the-middle\" effects [1], poor performance on multi-hop queries requiring reasoning over several evidence pieces [7], and difficulty with later conversational turns and unanswerable questions [8]. Healthcare reviews also note the absence of standardized evaluation frameworks [2]."
     },
-    off_topic: {
+      {
+      label: "Healthcare",
+      query: "What are the applications of retrieval-augmented generation in healthcare and medicine?",
+      papers: [
+        { title: "Retrieval augmented generation for large language models in healthcare: A systematic review", similarity: 0.5616934895515442, citations: 211 },
+        { title: "Benchmarking Retrieval-Augmented Generation for Medicine", similarity: 0.5259025692939758, citations: 588 },
+        { title: "Improving large language model applications in biomedicine with retrieval-augmented generation: a systematic review, meta-analysis, and clinical development guidelines", similarity: 0.467790424823761, citations: 163 },
+        { title: "Retrieval-Augmented Generation for AI-Generated Content: A Survey", similarity: 0.4580203592777252, citations: 673 },
+        { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: 0.44539177417755127, citations: 909 },
+        { title: "Retrieval-Augmented Generation for Large Language Models: A Survey", similarity: 0.43658778071403503, citations: 3837 },
+        { title: "Retrieval-Augmented Generation (RAG) Chatbots for Education: A Survey of Applications", similarity: 0.4254491329193115, citations: 103 },
+        { title: "MedRAG: Enhancing Retrieval-augmented Generation with Knowledge Graph-Elicited Reasoning for Healthcare Copilot", similarity: 0.41891199350357056, citations: 186 }
+      ],
+      report: "**Applications of RAG in Healthcare and Medicine**\n\nRetrieval-augmented generation has been adopted in healthcare primarily to address the limitations of large language models\u2014outdated training data, hallucination, and opacity\u2014by grounding outputs in external medical knowledge sources [1]. A dominant application area is medical question answering: the MIRAGE benchmark and MedRAG toolkit show that combining medical corpora with retrievers improves accuracy of six LLMs by up to 18% over chain-of-thought prompting, lifting GPT-3.5 and Mixtral to GPT-4-level performance across five medical QA datasets [2]. RAG is also applied to clinical decision support and diagnosis: knowledge graph-enhanced RAG can retrieve privacy-sensitive Electronic Health Records and integrate hierarchical diagnostic knowledge to produce diagnosis and treatment recommendations, reduce misdiagnosis for diseases with similar manifestations, and generate follow-up questions for personalized decision-making [8]. A systematic review and meta-analysis of biomedical studies found a pooled odds ratio of 1.35 (95% CI 1.19\u20131.53) favoring RAG over baseline LLMs across a range of clinical tasks, and proposed development guidelines for clinical deployment [3]. Remaining gaps include the lack of standardized evaluation frameworks, English-dominant datasets, limited attention to ethical considerations, and the need for deeper integration of RAG systems into electronic health records and agent-based architectures [1][3]."
+    },
+      {
+      label: "Benchmarking",
+      query: "How do researchers benchmark and evaluate retrieval-augmented generation systems?",
+      papers: [
+        { title: "Retrieval-Augmented Generation for AI-Generated Content: A Survey", similarity: 0.6489658355712891, citations: 673 },
+        { title: "Benchmarking Retrieval-Augmented Generation for Medicine", similarity: 0.6274698972702026, citations: 588 },
+        { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: 0.611083984375, citations: 909 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for Evaluating Retrieval-Augmented Generation Systems", similarity: 0.6015055775642395, citations: 76 },
+        { title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks", similarity: 0.5816624164581299, citations: 16973 },
+        { title: "Retrieval-Augmented Generation for Large Language Models: A Survey", similarity: 0.5807456970214844, citations: 3837 },
+        { title: "MultiHop-RAG: Benchmarking Retrieval-Augmented Generation for Multi-Hop Queries", similarity: 0.5541839599609375, citations: 314 },
+        { title: "Agentic Retrieval-Augmented Generation: A Survey on Agentic RAG", similarity: 0.5092189311981201, citations: 383 }
+      ],
+      report: "RAG evaluation generally decomposes the pipeline into retrieval and generation components, assessing whether retrieved passages are relevant and focused, whether the LLM uses them faithfully, and whether the final answer is of high quality \u2014 dimensions operationalized in reference-free, annotation-free metric suites such as RAGAs [3], with surveys noting these evaluation frameworks and benchmarks as a standard part of the RAG landscape [1][6]. Early work evaluated RAG largely through downstream task accuracy on knowledge-intensive NLP benchmarks, e.g., open-domain QA and generation tasks measured for specificity and factuality against parametric-only baselines [5]. More recent efforts build purpose-built benchmarks that stress particular capabilities: MultiHop-RAG supplies a knowledge base, multi-hop queries, ground-truth answers, and supporting evidence to separately benchmark embedding models for evidence retrieval and LLMs for reasoning over that evidence [7]; mtRAG uses human-generated multi-turn conversations across four domains to test later-turn, unanswerable, and non-standalone questions, combining human judgments with synthetic data and LLM-as-a-Judge automation [4]. Domain-specific benchmarking also emphasizes systematic ablation of pipeline configurations \u2014 MIRAGE evaluates 7,663 medical questions across 41 combinations of corpora, retrievers, and backbone LLMs to derive best-practice guidelines and surface phenomena such as scaling behavior and \"lost-in-the-middle\" effects [2]. Across this literature, evaluation remains an acknowledged open challenge, particularly for newer agentic RAG systems whose dynamic, multi-step workflows are harder to score than static pipelines [8]."
+    }
+    ],
+    off_topic: [
+      {
+      label: "Coral reefs",
       query: "What are the effects of ocean acidification on coral reef ecosystems?",
       papers: [
-        { title: "Improving LLM applications in biomedicine with RAG", similarity: 0.023568887263536453, citations: 163 },
-        { title: "PoisonedRAG: Knowledge Corruption Attacks to RAG of LLMs", similarity: -0.0033609718084335327, citations: 268 },
-        { title: "MTRAG: A Multi-Turn Conversational Benchmark for RAG", similarity: -0.014370199292898178, citations: 76 },
-        { title: "G-Retriever: RAG for Textual Graph Understanding and QA", similarity: -0.021786121651530266, citations: 335 },
-        { title: "ViDoRAG: Visual Document RAG via Dynamic Iterative Reasoning", similarity: -0.024366572499275208, citations: 69 },
-        { title: "RAG for Knowledge-Intensive NLP Tasks (2020)", similarity: -0.029770707711577415, citations: 16973 },
-        { title: "Agentic Retrieval-Augmented Generation: A Survey", similarity: -0.031780023127794266, citations: 383 },
+        { title: "Improving large language model applications in biomedicine with retrieval-augmented generation: a systematic review, meta-analysis, and clinical development guidelines", similarity: 0.023568887263536453, citations: 163 },
+        { title: "PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models", similarity: -0.0033609718084335327, citations: 268 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for Evaluating Retrieval-Augmented Generation Systems", similarity: -0.014370199292898178, citations: 76 },
+        { title: "G-Retriever: Retrieval-Augmented Generation for Textual Graph Understanding and Question Answering", similarity: -0.021786121651530266, citations: 335 },
+        { title: "ViDoRAG: Visual Document Retrieval-Augmented Generation via Dynamic Iterative Reasoning Agents", similarity: -0.024366572499275208, citations: 69 },
+        { title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks", similarity: -0.029770707711577415, citations: 16973 },
+        { title: "Agentic Retrieval-Augmented Generation: A Survey on Agentic RAG", similarity: -0.031780023127794266, citations: 383 },
         { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: -0.033591434359550476, citations: 909 }
       ],
-      report: "The provided abstracts do not support an answer to this query. All eight sources concern retrieval-augmented generation (RAG) and large language models in natural language processing — covering foundational RAG methods [6], evaluation frameworks and benchmarks [3], [8], graph- and vision-based RAG variants [4], [5], agentic RAG architectures [7], security vulnerabilities such as knowledge-corruption attacks [2], and biomedical/clinical applications [1]. None of them address ocean acidification, coral reefs, marine biology, or any environmental science topic. To answer your question, you would need a different set of sources drawn from marine or climate science literature."
+      report: "The provided abstracts do not support an answer to this query. All eight sources concern retrieval-augmented generation (RAG) and large language models in natural language processing \u2014 covering foundational RAG methods [6], evaluation frameworks and benchmarks [3], [8], graph- and vision-based RAG variants [4], [5], agentic RAG architectures [7], security vulnerabilities such as knowledge-corruption attacks [2], and biomedical/clinical applications [1]. None of them address ocean acidification, coral reefs, marine biology, or any environmental science topic. To answer your question, you would need a different set of sources drawn from marine or climate science literature."
+    },
+      {
+      label: "Aurora borealis",
+      query: "What causes the northern lights to appear in different colors?",
+      papers: [
+        { title: "VDocRAG: Retrieval-Augmented Generation over Visually-Rich Documents", similarity: 0.013940423727035522, citations: 64 },
+        { title: "LightRAG: Simple and Fast Retrieval-Augmented Generation", similarity: 0.008743414655327797, citations: 406 },
+        { title: "ViDoRAG: Visual Document Retrieval-Augmented Generation via Dynamic Iterative Reasoning Agents", similarity: 0.003946887329220772, citations: 69 },
+        { title: "HyperGraphRAG: Retrieval-Augmented Generation via Hypergraph-Structured Knowledge Representation", similarity: -0.007192937657237053, citations: 65 },
+        { title: "PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models", similarity: -0.028381269425153732, citations: 268 },
+        { title: "MultiHop-RAG: Benchmarking Retrieval-Augmented Generation for Multi-Hop Queries", similarity: -0.04707181826233864, citations: 314 },
+        { title: "Benchmarking Retrieval-Augmented Generation for Medicine", similarity: -0.059929266571998596, citations: 588 },
+        { title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks", similarity: -0.06189873814582825, citations: 16973 }
+      ],
+      report: "The provided abstracts cannot answer this query. All eight sources concern retrieval-augmented generation (RAG) for large language models \u2014 covering the original RAG architecture [8], graph- and hypergraph-based knowledge representations [2][4], visually-rich document retrieval [1][3], benchmarks for multi-hop and medical question answering [6][7], and security vulnerabilities such as knowledge-corruption attacks [5]. None of them discuss atmospheric physics, auroral emissions, or the excitation of oxygen and nitrogen that would be relevant to the coloration of the northern lights. To answer this question, you would need sources from space physics or atmospheric science rather than this natural language processing literature."
+    },
+      {
+      label: "Fall of Rome",
+      query: "What were the primary economic causes of the fall of the Roman Empire?",
+      papers: [
+        { title: "PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models", similarity: 0.034304264932870865, citations: 268 },
+        { title: "Retrieval-Augmented Generation for AI-Generated Content: A Survey", similarity: -0.012323453091084957, citations: 673 },
+        { title: "VDocRAG: Retrieval-Augmented Generation over Visually-Rich Documents", similarity: -0.021193675696849823, citations: 64 },
+        { title: "LightRAG: Simple and Fast Retrieval-Augmented Generation", similarity: -0.02190692350268364, citations: 406 },
+        { title: "HyperGraphRAG: Retrieval-Augmented Generation via Hypergraph-Structured Knowledge Representation", similarity: -0.02657320722937584, citations: 65 },
+        { title: "G-Retriever: Retrieval-Augmented Generation for Textual Graph Understanding and Question Answering", similarity: -0.028446458280086517, citations: 335 },
+        { title: "ViDoRAG: Visual Document Retrieval-Augmented Generation via Dynamic Iterative Reasoning Agents", similarity: -0.040754470974206924, citations: 69 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for Evaluating Retrieval-Augmented Generation Systems", similarity: -0.04378649592399597, citations: 76 }
+      ],
+      report: "The provided abstracts do not support an answer to this query. All eight sources are computer science papers about retrieval-augmented generation (RAG) systems for large language models, covering topics such as knowledge-corruption attacks on RAG databases [1], surveys of RAG for AI-generated content [2], retrieval over visually-rich documents [3][7], graph- and hypergraph-structured retrieval [4][5][6], and multi-turn conversational RAG benchmarks [8]. None of them discuss Roman history, ancient economies, taxation, currency debasement, trade, or any other economic factor relevant to the fall of the Roman Empire. To answer your question, you would need sources from historical or economic-history scholarship rather than this collection."
     }
+    ]
   };
 
   var THRESHOLD = 0.30;
-  var state = { query: 'on_topic', fix1: true, fix2: false, alpha: 0.5 };
+  var state = { category: 'on_topic', index: 0, fix1: true, fix2: false, alpha: 0.5 };
+
+  function currentEntry() { return DATA[state.category][state.index]; }
 
   function log1p(x) { return Math.log(1 + x); }
 
@@ -1306,7 +1430,8 @@ threshold:  0.30</code>
   }
 
   var els = {
-    queryToggle: document.getElementById('query-toggle'),
+    categoryToggle: document.getElementById('category-toggle'),
+    queryPicker: document.getElementById('query-picker'),
     fix1Toggle: document.getElementById('fix1-toggle'),
     fix2Toggle: document.getElementById('fix2-toggle'),
     alphaSlider: document.getElementById('alpha-slider'),
@@ -1322,8 +1447,15 @@ threshold:  0.30</code>
     reportText: document.getElementById('report-reveal-text')
   };
 
+  function renderPicker() {
+    var entries = DATA[state.category];
+    els.queryPicker.innerHTML = entries.map(function (e, i) {
+      return '<button class="query-pill' + (i === state.index ? ' is-active' : '') + '" type="button" data-index="' + i + '">' + escapeHtml(e.label) + '</button>';
+    }).join('');
+  }
+
   function explainText(ctx, changedWhat) {
-    var q = state.query === 'on_topic' ? 'on-topic' : 'off-topic';
+    var categoryLabel = state.category === 'on_topic' ? 'on-topic' : 'off-topic';
     if (changedWhat === 'fix1') {
       if (!state.fix1) {
         return 'Fix 1 disabled &mdash; the pipeline will call the model regardless of similarity (the naive, pre-fix behavior). Top similarity <code>' + ctx.topSim.toFixed(3) + '</code> is no longer checked against anything.';
@@ -1342,13 +1474,13 @@ threshold:  0.30</code>
       return '<code>α = ' + state.alpha.toFixed(2) + '</code> &mdash; blend recomputed live for all 8 papers. Current #1: "' + top2.title + '" at <code>' + top2.blended.toFixed(3) + '</code>.';
     }
     if (changedWhat === 'query') {
-      return 'Switched to the <b style="color:var(--ink-0)">' + q + '</b> query &mdash; same 18-paper corpus, same embedding model, same code path, only the query text changed. Top similarity is now <code>' + ctx.topSim.toFixed(3) + '</code>.';
+      return 'Switched to <b style="color:var(--ink-0)">' + escapeHtml(currentEntry().label) + '</b> (' + categoryLabel + ') &mdash; same 18-paper corpus, same embedding model, same code path, only the query text changed. Top similarity is now <code>' + ctx.topSim.toFixed(3) + '</code>.';
     }
     return 'Toggle a control above to watch the pipeline recompute in real time, on the real numbers.';
   }
 
   function render(changedWhat) {
-    var d = DATA[state.query];
+    var d = currentEntry();
     var raw = d.papers;
     var topSim = raw[0].similarity;
     var refused = state.fix1 && topSim < THRESHOLD;
@@ -1414,12 +1546,22 @@ threshold:  0.30</code>
     els.explainText.innerHTML = explainText({ topSim: topSim, refused: refused, display: display }, changedWhat);
   }
 
-  els.queryToggle.addEventListener('click', function (e) {
+  els.categoryToggle.addEventListener('click', function (e) {
     var btn = e.target.closest('.segmented__btn');
     if (!btn) return;
-    Array.prototype.forEach.call(els.queryToggle.children, function (b) { b.classList.remove('is-active'); });
+    Array.prototype.forEach.call(els.categoryToggle.children, function (b) { b.classList.remove('is-active'); });
     btn.classList.add('is-active');
-    state.query = btn.dataset.query;
+    state.category = btn.dataset.category;
+    state.index = 0;
+    renderPicker();
+    render('query');
+  });
+
+  els.queryPicker.addEventListener('click', function (e) {
+    var btn = e.target.closest('.query-pill');
+    if (!btn) return;
+    state.index = parseInt(btn.dataset.index, 10);
+    renderPicker();
     render('query');
   });
 
@@ -1439,7 +1581,7 @@ threshold:  0.30</code>
   });
 
   els.revealBtn.addEventListener('click', function () {
-    var d = DATA[state.query];
+    var d = currentEntry();
     var isHidden = els.reportReveal.hidden;
     if (isHidden) {
       els.reportLabel.textContent = 'Captured live against claude-opus-5, 2026-08-13 — replayed verbatim. This is the real non-reranked transcript for this query; a static page can’t safely hold a live API key to re-call it for every blend weight.';
@@ -1452,6 +1594,7 @@ threshold:  0.30</code>
     }
   });
 
+  renderPicker();
   render();
 
   // ---------- questions I asked accordion ----------

@@ -127,7 +127,15 @@ as the "can it be implemented" demonstration plus a proposed improvement.
       honest surprise → Fix 1 → Fix 2 → conclusion) using only real,
       live-run numbers and quotes. Published as a Claude Artifact
       (https://claude.ai/code/artifact/21ef8d2d-33ad-400b-a887-d1bedaf4d80b).
-      See `site/AGENTS.md`.
+      Extended with a genuinely live-computing interactive console (real
+      threshold check + real citation blend, executed client-side) and a
+      "Questions I Asked" section. See `site/AGENTS.md`.
+- [x] Replicated the naive off-topic decline on 2 more domains (aurora
+      borealis, fall of Rome) plus 2 more on-topic queries (healthcare,
+      benchmarking) — all 3 off-topic queries declined honestly, 0
+      exceptions; all 3 on-topic queries answered correctly. Saved at
+      `demo/sample_output_extended.json`; all 6 queries are selectable in
+      the site's interactive console. See `demo/AGENTS.md` § Replication.
 
 ## Known design tradeoffs (updated as they're discovered)
 
