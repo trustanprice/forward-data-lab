@@ -58,6 +58,7 @@ as the "can it be implemented" demonstration plus a proposed improvement.
 | `src/rerank/` | Fix 2 — citation-weighted blended reranking | [src/rerank/AGENTS.md](src/rerank/AGENTS.md) |
 | `src/generation/` | LLM call producing the synthesized report with inline citations; wires in Fix 1 | [src/generation/AGENTS.md](src/generation/AGENTS.md) |
 | `demo/` | Orchestrates the full pipeline; runs the on-topic/off-topic failure demo and the before/after comparison | [demo/AGENTS.md](demo/AGENTS.md) |
+| `site/` | Static single-page report artifact ("Liquid Glass" demo page) presenting the project story and live results for a human reader — not part of the Python pipeline | [site/AGENTS.md](site/AGENTS.md) |
 | `src/config.py` | Shared paths/constants used by every module above (not a sub-agent folder — a shared utility, documented here) | — |
 
 ## Conventions
@@ -121,6 +122,12 @@ as the "can it be implemented" demonstration plus a proposed improvement.
       Fix 1 replaces "hope" with a mechanical guarantee.
 - [x] Final AGENTS.md pass reflecting the real demo output, and the
       consolidated failure-modes/tradeoffs notes below, are complete.
+- [x] `site/index.html` built — a static, single-page "Liquid Glass"
+      report artifact presenting the full story (Asta testing beats → the
+      honest surprise → Fix 1 → Fix 2 → conclusion) using only real,
+      live-run numbers and quotes. Published as a Claude Artifact
+      (https://claude.ai/code/artifact/21ef8d2d-33ad-400b-a887-d1bedaf4d80b).
+      See `site/AGENTS.md`.
 
 ## Known design tradeoffs (updated as they're discovered)
 
