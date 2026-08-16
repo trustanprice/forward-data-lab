@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%94%8D%3C/text%3E%3C/svg%3E">
+<title>Retrieval's Blind Spot</title>
+<meta name="description" content="A live test of naive top-k retrieval against Claude Opus 5 — what actually happens when the corpus doesn't match the question, and two fixes for it.">
+
+<style>
+  :root {
+    --bg-0: #07060c;
+    --bg-1: #14101f;
+    --bg-2: #201a30;
+    --blob-violet: #5a4a9e;
+    --blob-teal: #2c6b74;
+
+    --ink-0: #f4f2fa;
+    --ink-1: rgba(244, 242, 250, 0.70);
+    --ink-2: rgba(244, 242, 250, 0.46);
+    --ink-3: rgba(244, 242, 250, 0.28);
+
+    --accent: #8d7ef7;
+    --accent-strong: #ac9bff;
+    --accent-wash: rgba(141, 126, 247, 0.14);
+
+    --success: #6fd6ac;
+    --success-wash: rgba(111, 214, 172, 0.13);
+    --caution: #e7b568;
+    --caution-wash: rgba(231, 181, 104, 0.13);
+
+    --glass-fill: rgba(255, 255, 255, 0.065);
+    --glass-fill-strong: rgba(255, 255, 255, 0.10);
+    --glass-border: rgba(255, 255, 255, 0.13);
+    --glass-border-strong: rgba(255, 255, 255, 0.22);
+
+    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --shadow-tight: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-ambient: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { color-scheme: dark; }
+
+  body {
+    margin: 0;
+    background: var(--bg-0);
+    color: var(--ink-0);
+    font-family: var(--font-body);
+    font-size: 16.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  }
+
+  /* ---------- atmosphere ---------- */
+
+  .canvas {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(ellipse 900px 600px at 12% -8%, rgba(90, 74, 158, 0.35), transparent 60%),
+      radial-gradient(ellipse 800px 700px at 88% 18%, rgba(44, 107, 116, 0.28), transparent 55%),
+      radial-gradient(ellipse 1000px 800px at 50% 105%, rgba(90, 74, 158, 0.22), transparent 60%),
+      linear-gradient(165deg, var(--bg-1) 0%, var(--bg-0) 45%, var(--bg-2) 100%);
+  }
+
+  .canvas::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  /* ---------- topbar ---------- */
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    padding: 0 20px;
+    background: rgba(15, 12, 22, 0.55);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .topbar__title {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    letter-spacing: 0.01em;
+  }
+
+  .topbar__title b { color: var(--ink-1); font-weight: 600; }
+
+  /* ---------- layout ---------- */
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  section { padding: 88px 0; }
+  section:first-of-type { padding-top: 64px; }
+
+  .annotated {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 250px;
+    gap: 44px;
+    align-items: start;
+  }
+
+  @media (max-width: 860px) {
+    .annotated { grid-template-columns: 1fr; }
+    .wrap { padding: 0 20px; }
+    section { padding: 64px 0; }
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 14px;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 16px;
+    height: 1px;
+    background: var(--accent);
+    opacity: 0.7;
+  }
+
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: clamp(26px, 3.4vw, 34px);
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 16px;
+    color: var(--ink-0);
+  }
+
+  .lede {
+    font-size: 18px;
+    line-height: 1.65;
+    color: var(--ink-1);
+    max-width: 62ch;
+    margin: 0 0 40px;
+  }
+
+  /* ---------- glass primitives ---------- */
+
+  .glass {
+    background: var(--glass-fill);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+    box-shadow: var(--shadow-tight), var(--shadow-ambient);
+  }
+
+  .glass--pad { padding: 28px 30px; }
+
+  /* ---------- hero ---------- */
+
+  .hero { padding-top: 76px; }
+
+  .hero__kicker {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--ink-2);
+    letter-spacing: 0.04em;
+    margin: 0 0 18px;
+  }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-weight: 680;
+    font-size: clamp(34px, 5vw, 54px);
+    line-height: 1.06;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+    margin: 0 0 22px;
+    background: linear-gradient(135deg, #ffffff 0%, #d9d3ff 55%, #b9aeff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero__sub {
+    font-size: 19px;
+    color: var(--ink-1);
+    max-width: 58ch;
+    line-height: 1.6;
+    margin: 0 0 22px;
+  }
+
+  .hero__byline {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    max-width: 60ch;
+    line-height: 1.6;
+    margin: 0 0 44px;
+    padding-left: 14px;
+    border-left: 2px solid rgba(141, 126, 247, 0.3);
+  }
+
+  .hero__byline b { color: var(--ink-0); font-weight: 600; }
+
+  .beats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 34px;
+  }
+
+  @media (max-width: 780px) {
+    .beats { grid-template-columns: 1fr; }
+  }
+
+  .beat {
+    padding: 24px 24px 26px;
+    position: relative;
+    transition: transform 0.25s ease, border-color 0.25s ease;
+  }
+
+  .beat:hover { transform: translateY(-3px); border-color: var(--glass-border-strong); }
+
+  .beat__traffic {
+    display: flex;
+    gap: 7px;
+    margin-bottom: 18px;
+  }
+
+  .beat__traffic span {
+    width: 11px; height: 11px; border-radius: 50%;
+    display: inline-block;
+  }
+  .beat__traffic span:nth-child(1) { background: #ff6159; }
+  .beat__traffic span:nth-child(2) { background: #ffbd2e; }
+  .beat__traffic span:nth-child(3) { background: #28c941; }
+
+  .beat__label {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    margin: 0 0 12px;
+  }
+
+  .beat p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ink-1);
+  }
+
+  .beat strong { color: var(--ink-0); font-weight: 600; }
+
+  .transition-strip {
+    text-align: center;
+    padding: 26px 40px;
+    margin: 8px 0 40px;
+  }
+
+  .transition-strip p {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(17px, 2.2vw, 21px);
+    font-weight: 560;
+    color: var(--ink-0);
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+  }
+
+  .transition-strip .arrow-chain {
+    font-family: var(--font-mono);
+    color: var(--accent-strong);
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .stat-chip {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    background: var(--glass-fill);
+    border: 1px solid var(--glass-border);
+    font-size: 13.5px;
+    color: var(--ink-1);
+  }
+
+  .stat-chip b {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-0);
+    font-weight: 600;
+    font-size: 14.5px;
+  }
+
+  .provenance-note {
+    margin-top: 34px;
+    font-size: 13px;
+    color: var(--ink-3);
+    font-style: italic;
+  }
+
+  /* ---------- query cards ---------- */
+
+  .query-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 780px) {
+    .query-grid { grid-template-columns: 1fr; }
+  }
+
+  .qcard { padding: 26px 26px 28px; display: flex; flex-direction: column; }
+
+  .qcard__query {
+    font-size: 13px;
+    color: var(--ink-2);
+    margin: 0 0 6px;
+  }
+
+  .qcard__q-text {
+    font-size: 15.5px;
+    color: var(--ink-0);
+    font-weight: 560;
+    line-height: 1.45;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+
+  .qcard__sim {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ink-2);
+    margin-bottom: 16px;
+  }
+
+  .qcard__sim b {
+    font-size: 16px;
+    color: var(--ink-0);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .qcard__body {
+    font-size: 14.5px;
+    line-height: 1.62;
+    color: var(--ink-1);
+    flex: 1;
+    margin-bottom: 18px;
+  }
+
+  .qcard__body em { color: var(--ink-1); font-style: normal; }
+  .qcard__body .cite { color: var(--accent-strong); font-size: 0.85em; vertical-align: super; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 6px 13px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+
+  .chip--answered { background: var(--success-wash); color: var(--success); }
+  .chip--answered::before { background: var(--success); }
+
+  .chip--declined { background: var(--caution-wash); color: var(--caution); }
+  .chip--declined::before { background: var(--caution); }
+
+  .chip--refused { background: var(--accent-wash); color: var(--accent-strong); }
+  .chip--refused::before { background: var(--accent); }
+
+  /* ---------- margin annotation ---------- */
+
+  .annotation {
+    position: sticky;
+    top: 70px;
+    padding: 20px 22px;
+  }
+
+  .annotation__label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    margin: 0 0 10px;
+  }
+
+  .annotation code {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--accent-strong);
+    background: rgba(141, 126, 247, 0.09);
+    border: 1px solid rgba(141, 126, 247, 0.18);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0 0 14px;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  .annotation p {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ink-1);
+  }
+
+  .annotation p + p { margin-top: 10px; }
+  .annotation .callout { color: var(--ink-0); font-weight: 600; }
+
+  /* ---------- fix 2 rank lists ---------- */
+
+  .rank-compare {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 22px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 780px) {
+    .rank-compare { grid-template-columns: 1fr; }
+    .rank-compare .rank-arrow { display: none; }
+  }
+
+  .rank-col h4 {
+    margin: 0 0 12px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-2);
+    font-weight: 600;
+  }
+
+  .rank-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+  .rank-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid transparent;
+    font-size: 13px;
+  }
+
+  .rank-item__n {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    width: 18px;
+    color: var(--ink-3);
+    font-size: 12px;
+  }
+
+  .rank-item__t {
+    flex: 1;
+    color: var(--ink-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rank-item--hl {
+    background: var(--accent-wash);
+    border-color: rgba(141, 126, 247, 0.3);
+  }
+  .rank-item--hl .rank-item__n { color: var(--accent-strong); }
+  .rank-item--hl .rank-item__t { color: var(--ink-0); font-weight: 600; }
+
+  .rank-arrow {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    color: var(--accent);
+    opacity: 0.8;
+  }
+
+  .limitation-card {
+    margin-top: 20px;
+    padding: 22px 24px;
+    border-color: rgba(231, 181, 104, 0.22);
+  }
+
+  .limitation-card__label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--caution);
+    margin: 0 0 12px;
+  }
+
+  .limitation-card ol {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .limitation-card li {
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--ink-1);
+  }
+
+  .limitation-card li b { color: var(--ink-0); }
+
+  /* ---------- conclusion ---------- */
+
+  .recap {
+    font-size: 16.5px;
+    line-height: 1.7;
+    color: var(--ink-1);
+    max-width: 68ch;
+    margin: 0 0 36px;
+  }
+
+  .recap b { color: var(--ink-0); font-weight: 600; }
+
+  .next-step {
+    padding: 30px 32px;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  @media (max-width: 640px) {
+    .next-step { flex-direction: column; }
+  }
+
+  .next-step__badge {
+    flex-shrink: 0;
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    background: var(--accent-wash);
+    border: 1px solid rgba(141, 126, 247, 0.3);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent-strong);
+    font-family: var(--font-mono);
+    font-size: 15px;
+  }
+
+  .next-step h3 {
+    margin: 0 0 8px;
+    font-size: 16.5px;
+    font-weight: 650;
+    color: var(--ink-0);
+  }
+
+  .next-step p {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--ink-1);
+  }
+
+  footer {
+    padding: 46px 0 70px;
+    text-align: center;
+  }
+
+  footer p {
+    font-size: 12.5px;
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    margin: 0 0 6px;
+  }
+
+  footer p:last-child { margin-bottom: 0; }
+
+  footer .footer__name {
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+
+  /* ---------- interactive console ---------- */
+
+  .console { padding: 30px 32px 34px; }
+
+  .console__controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px;
+    padding-bottom: 26px;
+    margin-bottom: 26px;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  @media (max-width: 780px) {
+    .console__controls { grid-template-columns: 1fr; }
+  }
+
+  .control-group { display: flex; flex-direction: column; gap: 10px; }
+
+  .control-group__label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink-2);
+  }
+
+  .segmented {
+    display: inline-flex;
+    padding: 3px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 11px;
+    gap: 2px;
+    width: fit-content;
+  }
+
+  .segmented__btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 560;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  .segmented__btn:hover { color: var(--ink-0); }
+  .segmented__btn:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+  .segmented__btn.is-active { background: var(--accent); color: #0c0a16; }
+
+  .switch { display: inline-flex; align-items: center; cursor: pointer; width: fit-content; position: relative; }
+  .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+
+  .switch__track {
+    width: 42px;
+    height: 25px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid var(--glass-border);
+    position: relative;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .switch__thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 19px; height: 19px;
+    border-radius: 50%;
+    background: var(--ink-1);
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+
+  .switch input:checked + .switch__track { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + .switch__track .switch__thumb { transform: translateX(17px); background: #0c0a16; }
+  .switch input:focus-visible + .switch__track { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+  .slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent) var(--fill, 50%), rgba(255, 255, 255, 0.12) var(--fill, 50%), rgba(255, 255, 255, 0.12) 100%);
+    outline: none;
+    margin-top: 4px;
+  }
+
+  .slider:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 4px; }
+
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 17px; height: 17px;
+    border-radius: 50%;
+    background: var(--ink-0);
+    border: 3px solid var(--accent);
+    cursor: pointer;
+  }
+
+  .slider::-moz-range-thumb {
+    width: 17px; height: 17px;
+    border-radius: 50%;
+    background: var(--ink-0);
+    border: 3px solid var(--accent);
+    cursor: pointer;
+  }
+
+  .slider__endcaps {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: var(--ink-3);
+    margin-top: 2px;
+  }
+
+  .query-picker {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .query-pill {
+    appearance: none;
+    padding: 8px 15px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink-2);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 560;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  }
+
+  .query-pill:hover { color: var(--ink-0); border-color: var(--glass-border-strong); }
+  .query-pill:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+  .query-pill.is-active {
+    background: var(--accent-wash);
+    border-color: rgba(141, 126, 247, 0.4);
+    color: var(--accent-strong);
+  }
+
+  .console__query-display {
+    font-size: 13px;
+    color: var(--ink-2);
+    margin: 0 0 14px;
+  }
+
+  .console__query-display b { color: var(--ink-0); font-weight: 560; }
+
+  .paper-ledger {
+    list-style: none;
+    margin: 0 0 20px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ledger-item {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) 78px 92px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid transparent;
+    transition: background 0.4s ease, border-color 0.4s ease;
+  }
+
+  @media (max-width: 640px) {
+    .ledger-item { grid-template-columns: 20px minmax(0, 1fr) 66px; }
+    .ledger-item__cite { display: none; }
+  }
+
+  .ledger-item--top { background: var(--accent-wash); border-color: rgba(141, 126, 247, 0.28); }
+
+  .ledger-item__n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink-3); }
+  .ledger-item--top .ledger-item__n { color: var(--accent-strong); }
+
+  .ledger-item__t { font-size: 13px; color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ledger-item--top .ledger-item__t { color: var(--ink-0); font-weight: 560; }
+
+  .ledger-item__sim, .ledger-item__cite {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
+    color: var(--ink-2);
+    text-align: right;
+  }
+
+  .verdict {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    font-weight: 560;
+    margin-bottom: 20px;
+  }
+
+  .verdict::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .verdict--go { background: var(--success-wash); color: var(--success); }
+  .verdict--go::before { background: var(--success); }
+
+  .verdict--stop { background: var(--accent-wash); color: var(--accent-strong); }
+  .verdict--stop::before { background: var(--accent); }
+
+  .explain-panel {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed var(--glass-border-strong);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+
+  .explain-panel__label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    margin: 0 0 8px;
+  }
+
+  .explain-panel p:last-child { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-1); }
+
+  .explain-panel code {
+    font-family: var(--font-mono);
+    color: var(--accent-strong);
+    background: rgba(141, 126, 247, 0.1);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.92em;
+  }
+
+  .reveal-btn {
+    appearance: none;
+    margin-top: 20px;
+    padding: 12px 20px;
+    border-radius: 11px;
+    border: 1px solid rgba(141, 126, 247, 0.35);
+    background: var(--accent-wash);
+    color: var(--accent-strong);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+
+  .reveal-btn:hover { background: rgba(141, 126, 247, 0.22); transform: translateY(-1px); }
+  .reveal-btn:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 3px; }
+
+  .report-reveal {
+    margin-top: 20px;
+    padding: 22px 24px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+  }
+
+  .report-reveal__label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    margin: 0 0 12px;
+    line-height: 1.5;
+  }
+
+  .report-reveal__text { font-size: 14px; line-height: 1.68; color: var(--ink-1); white-space: pre-wrap; }
+
+  /* ---------- questions I asked ---------- */
+
+  .qa-list { display: flex; flex-direction: column; gap: 14px; }
+
+  .qa-item { overflow: hidden; transition: border-color 0.25s ease; }
+
+  .qa-item__q {
+    appearance: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 22px 26px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+
+  .qa-item__q:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+
+  .qa-item__index {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-3);
+    flex-shrink: 0;
+    width: 20px;
+  }
+
+  .qa-item__q-text {
+    flex: 1;
+    font-size: 15.5px;
+    font-weight: 560;
+    color: var(--ink-0);
+    line-height: 1.5;
+  }
+
+  .qa-item__chevron {
+    flex-shrink: 0;
+    color: var(--accent-strong);
+    font-size: 13px;
+    transition: transform 0.3s ease;
+  }
+
+  .qa-item.is-open { border-color: var(--glass-border-strong); }
+  .qa-item.is-open .qa-item__chevron { transform: rotate(180deg); }
+
+  .qa-item__a {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.35s ease;
+  }
+
+  .qa-item.is-open .qa-item__a { grid-template-rows: 1fr; }
+
+  .qa-item__a-inner { overflow: hidden; }
+
+  .qa-item__a-inner p {
+    margin: 0;
+    padding: 0 26px 26px 62px;
+    font-size: 14.5px;
+    line-height: 1.68;
+    color: var(--ink-1);
+  }
+
+  /* ---------- reveal on scroll ---------- */
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .reveal.is-visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="canvas"></div>
+
+<div class="topbar">
+  <div class="topbar__title">● <b>retrieval-blind-spot</b> — task0/site — live run, 2026-08-13</div>
+</div>
+
+<main class="wrap">
+
+  <section class="hero">
+    <p class="hero__kicker">A field test of naive top-k retrieval</p>
+    <h1>The evidence was already there. Nothing used it.</h1>
+    <p class="hero__sub">I tested Asta against Google Scholar on a real research question, found a specific gap in how it weighs evidence, then built a minimal version of its pipeline — small enough to fully inspect — and ran it live to see whether the gap actually shows up.</p>
+
+    <p class="hero__byline">By <b>Trustan Price</b>, University of Illinois Urbana-Champaign — built with the same instinct that shaped a 100%-audit-coverage push at Caterpillar and a failure-detection model for NBA predictions: don't trust a pipeline until you've verified what it's actually doing.</p>
+
+    <div class="beats">
+      <div class="glass beat reveal">
+        <div class="beat__traffic"><span></span><span></span><span></span></div>
+        <p class="beat__label">01 · testing asta vs. scholar</p>
+        <p>I ran the same natural-language research question through both Asta and Google Scholar. Scholar returned nothing — <em>"did not match any articles"</em> — until I manually rewrote it as a keyword string. Asta did that rewriting itself, silently, before searching a corpus of <strong>12M+ papers</strong>.</p>
+      </div>
+      <div class="glass beat reveal">
+        <p class="beat__label">02 · under the hood</p>
+        <p>Asta's own step log reveals the real pipeline: reformulate the query, retrieve broadly, rerank, then cap the pool to roughly <strong>50 papers</strong> before writing a single sentence. Every citation I checked was real — not hallucinated. But nothing after the cap step verifies the shortlist is actually right.</p>
+      </div>
+      <div class="glass beat reveal">
+        <p class="beat__label">03 · the gap that motivated this</p>
+        <p>Asta surfaces citation counts if you go looking — a <strong>3-citation 2026 paper</strong> and a <strong>16,950-citation 2020 paper</strong> both sit in its source list. In the generated narrative, they're treated as equally strong evidence. The data to tell them apart was there the whole time, unused.</p>
+      </div>
+    </div>
+
+    <div class="glass transition-strip reveal">
+      <p>So I built a minimal version of that same <span class="arrow-chain">retrieve → rerank → cap → generate</span> pipeline — and ran it live against Claude Opus 5 to see whether the same gap shows up.</p>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-chip"><b>18</b> papers</div>
+      <div class="stat-chip"><b>64–16,973</b> citations spanned</div>
+      <div class="stat-chip"><b>0.30</b> similarity threshold</div>
+    </div>
+
+    <p class="provenance-note">Everything below is real, live-run output against Claude Opus 5 — not placeholder copy. Source: <code style="font-family: var(--font-mono); background: none; border: none; padding: 0; display: inline;">demo/sample_output_naive.json</code> and <code style="font-family: var(--font-mono); background: none; border: none; padding: 0; display: inline;">demo/AGENTS.md</code>.</p>
+  </section>
+
+  <section id="console">
+    <div class="eyebrow">Interactive — computed live, in your browser</div>
+    <h2>Run it yourself</h2>
+    <p class="lede">Not a recording. The threshold check and the citation blend below execute right here, on the same real similarity scores and citation counts the pipeline produced — across 3 on-topic and 3 off-topic queries, all run live against Claude Opus 5. All three off-topic queries got the same honest decline, in three completely unrelated domains. Flip the switches — the numbers actually move.</p>
+
+    <div class="glass console reveal">
+      <div class="console__controls">
+        <div class="control-group">
+          <span class="control-group__label">Query category</span>
+          <div class="segmented" id="category-toggle" role="group" aria-label="Select query category">
+            <button class="segmented__btn is-active" data-category="on_topic" type="button">On-topic</button>
+            <button class="segmented__btn" data-category="off_topic" type="button">Off-topic</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <span class="control-group__label">Fix 1 — relevance threshold</span>
+          <label class="switch">
+            <input type="checkbox" id="fix1-toggle" checked>
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+          </label>
+        </div>
+        <div class="control-group">
+          <span class="control-group__label">Fix 2 — citation rerank<span id="alpha-inline"></span></span>
+          <label class="switch">
+            <input type="checkbox" id="fix2-toggle">
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+          </label>
+          <input type="range" id="alpha-slider" min="0" max="1" step="0.05" value="0.5" class="slider" hidden>
+          <div class="slider__endcaps" id="alpha-endcaps" hidden><span>favor citations</span><span>favor similarity</span></div>
+        </div>
+      </div>
+
+      <div class="query-picker" id="query-picker" role="group" aria-label="Select specific query"></div>
+
+      <p class="console__query-display" id="active-query"></p>
+      <ol class="paper-ledger" id="paper-ledger"></ol>
+      <div class="verdict" id="verdict"></div>
+
+      <div class="explain-panel">
+        <p class="explain-panel__label">What that click just did</p>
+        <p id="explain-text"></p>
+      </div>
+
+      <button class="reveal-btn" id="reveal-report-btn" type="button" hidden>Reveal the generated report →</button>
+      <div class="report-reveal" id="report-reveal" hidden>
+        <p class="report-reveal__label" id="report-reveal-label"></p>
+        <div class="report-reveal__text" id="report-reveal-text"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="surprise">
+    <div class="eyebrow">Naive pipeline — Fix 1 disabled</div>
+    <h2>The honest surprise</h2>
+    <p class="lede">With the relevance gate turned off, the pipeline still called the model on both queries. One was answerable. One wasn't. Only one of those two outcomes turned out to be guaranteed.</p>
+
+    <div class="annotated">
+      <div class="query-grid">
+        <div class="glass qcard reveal">
+          <p class="qcard__query">On-topic query</p>
+          <p class="qcard__q-text">"How does retrieval-augmented generation reduce hallucinations in large language models?"</p>
+          <div class="qcard__sim">top similarity <b>0.567</b></div>
+          <div class="qcard__body">Produced a well-grounded report with correct inline citations — MedRAG's <b style="color:var(--ink-0)">18% accuracy gain</b> over chain-of-thought prompting, a biomedical meta-analysis odds ratio of <b style="color:var(--ink-0)">1.35</b>, and named limitations (lost-in-the-middle, multi-hop weakness) pulled straight from the abstracts.</div>
+          <span class="chip chip--answered">Answered — grounded</span>
+        </div>
+        <div class="glass qcard reveal">
+          <p class="qcard__query">Off-topic query</p>
+          <p class="qcard__q-text">"What are the effects of ocean acidification on coral reef ecosystems?"</p>
+          <div class="qcard__sim">top similarity <b>0.024</b> · range −0.034 to 0.024</div>
+          <div class="qcard__body">"The provided abstracts do not support an answer to this query&nbsp;&hellip; None of them address ocean acidification, coral reefs, marine biology, or any environmental science topic."</div>
+          <span class="chip chip--declined">Declined — but not guaranteed</span>
+        </div>
+      </div>
+
+      <aside class="glass annotation reveal">
+        <p class="annotation__label">Command</p>
+        <code>python -m demo.run_demo \
+  --on-topic "..." \
+  --off-topic "..." \
+  --no-threshold</code>
+        <p class="callout">Retrieval itself is unambiguously fragile — these are noise-level similarity scores.</p>
+        <p>But this recovery came from one model's prompt-following behavior in one test. Not deterministic. Not free — a full paid API call happened either way. Not inspectable in advance. And not what Asta itself was observed doing.</p>
+        <p>That's the case for Fix&nbsp;1.</p>
+      </aside>
+    </div>
+  </section>
+
+  <section id="fix1">
+    <div class="eyebrow">Fix 1 — relevance threshold</div>
+    <h2>Same outcome. Different reason to trust it.</h2>
+    <p class="lede">Enforcing the threshold by default doesn't change what happens for the off-topic query — it changes <em style="color: var(--ink-0); font-style: normal;">why</em> it happens.</p>
+
+    <div class="annotated">
+      <div class="query-grid">
+        <div class="glass qcard reveal">
+          <p class="qcard__query">Off-topic query · default flags</p>
+          <p class="qcard__q-text">"What are the effects of ocean acidification on coral reef ecosystems?"</p>
+          <div class="qcard__sim">top similarity <b>0.024</b> · threshold <b>0.30</b></div>
+          <div class="qcard__body">"No sufficiently relevant papers found in the corpus for this query (top similarity score did not clear the 0.30 confidence threshold)."</div>
+          <span class="chip chip--refused">Refused — zero API calls</span>
+        </div>
+        <div class="glass qcard reveal">
+          <p class="qcard__query">On-topic query · default flags</p>
+          <p class="qcard__q-text">"How does retrieval-augmented generation reduce hallucinations in large language models?"</p>
+          <div class="qcard__sim">top similarity <b>0.567</b> · threshold <b>0.30</b></div>
+          <div class="qcard__body">Identical to the naive result above — a query that already clears the bar is untouched by Fix 1. Nothing to gate.</div>
+          <span class="chip chip--answered">Answered — unchanged</span>
+        </div>
+      </div>
+
+      <aside class="glass annotation reveal">
+        <p class="annotation__label">Calibration</p>
+        <code>on-topic:  0.396 – 0.567
+off-topic: −0.034 – 0.024
+threshold:  0.30</code>
+        <p class="callout">Deterministic, free, and instant instead of depending on a model's judgment call.</p>
+        <p>Confirmed both with and without an API key present — the refusal never reaches the network.</p>
+      </aside>
+    </div>
+  </section>
+
+  <section id="fix2">
+    <div class="eyebrow">Fix 2 — citation-weighted reranking</div>
+    <h2>Reranking changes prominence, not survival</h2>
+    <p class="lede">Blending normalized similarity with log-scaled citation count, within the retrieved pool, moves the field's most established paper from the middle of the pack toward the top.</p>
+
+    <div class="glass glass--pad reveal">
+      <div class="rank-compare">
+        <div class="rank-col">
+          <h4>Pure similarity</h4>
+          <ol class="rank-list">
+            <li class="rank-item"><span class="rank-item__n">1</span><span class="rank-item__t">Benchmarking RAG for Medicine</span></li>
+            <li class="rank-item"><span class="rank-item__n">2</span><span class="rank-item__t">RAG for LLMs in Healthcare</span></li>
+            <li class="rank-item"><span class="rank-item__n">3</span><span class="rank-item__t">RAGAs</span></li>
+            <li class="rank-item"><span class="rank-item__n">4</span><span class="rank-item__t">RAG Applications in Biomedicine</span></li>
+            <li class="rank-item"><span class="rank-item__n">5</span><span class="rank-item__t">RAG for LLMs: A Survey</span></li>
+            <li class="rank-item rank-item--hl"><span class="rank-item__n">6</span><span class="rank-item__t">RAG for Knowledge-Intensive NLP (2020) — 16,973 cites</span></li>
+          </ol>
+        </div>
+        <div class="rank-arrow">→</div>
+        <div class="rank-col">
+          <h4>Citation-weighted blend</h4>
+          <ol class="rank-list">
+            <li class="rank-item"><span class="rank-item__n">1</span><span class="rank-item__t">Benchmarking RAG for Medicine</span></li>
+            <li class="rank-item rank-item--hl"><span class="rank-item__n">2</span><span class="rank-item__t">RAG for Knowledge-Intensive NLP (2020) — 16,973 cites</span></li>
+            <li class="rank-item"><span class="rank-item__n">3</span><span class="rank-item__t">RAG for LLMs: A Survey</span></li>
+            <li class="rank-item"><span class="rank-item__n">4</span><span class="rank-item__t">RAGAs</span></li>
+            <li class="rank-item"><span class="rank-item__n">5</span><span class="rank-item__t">RAG for LLMs in Healthcare</span></li>
+            <li class="rank-item"><span class="rank-item__n">6</span><span class="rank-item__t">RAG Applications in Biomedicine</span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="annotated" style="margin-top: 20px;">
+      <div class="glass limitation-card reveal">
+        <p class="limitation-card__label">What this doesn't fix</p>
+        <ol>
+          <li>At <b>top_k=5</b> instead of 8, the seminal paper — rank 6 by pure similarity — is excluded from the candidate pool <b>before reranking ever runs</b>. Verified directly: it can't rescue what similarity already cut.</li>
+          <li>Its effect on the <b>generated narrative</b> was smaller than its effect on ranking in this test — likely because citation counts are already visible as plain text in the model's context, regardless of numbering order.</li>
+        </ol>
+      </div>
+
+      <aside class="glass annotation reveal">
+        <p class="annotation__label">Command</p>
+        <code>python -m src.generation.generate \
+  "..." --rerank</code>
+        <p>Blend: log-scaled citation count + normalized similarity, weighted 50/50, within the retrieved pool.</p>
+        <p class="callout">Top-k still decides who's in the room.</p>
+      </aside>
+    </div>
+  </section>
+
+  <section id="questions">
+    <div class="eyebrow">Design review — questions I pushed on</div>
+    <h2>Questions I asked</h2>
+    <p class="lede">Building this surfaced real tradeoffs worth interrogating — including a few places where my first instinct about how these fixes actually work turned out to be wrong.</p>
+
+    <div class="qa-list">
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">01</span>
+          <span class="qa-item__q-text">Isn't the off-topic query just testing whether high-citation papers get pulled in regardless of relevance?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>No — retrieval runs on embedding similarity alone; citation count never enters into which papers make top-k. Only Fix 2 uses it, and only to reorder papers retrieval already found. What the off-topic query actually proves is that naive top-k has no relevance floor — it returned 8 "top" papers for the coral-reef query with similarity scores from −0.034 to 0.024, pure noise, and ranked them with the same confidence as a real match. The theoretical risk is an LLM forced to answer from those 8 irrelevant papers, producing something that reads as grounded while answering the wrong question. In the live run here, Claude Opus 5 caught the mismatch itself and declined — which doesn't make the risk fake, it means this model, this once, didn't need Fix 1 to avoid it.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">02</span>
+          <span class="qa-item__q-text">Does Fix 1 improve retrieval — get us more similar papers to choose from?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>No. Fix 1 never touches retrieval or the candidate pool — the top-k list is identical whether it's on or off. It's a gate applied <em style="font-style:normal;color:var(--ink-0);">after</em> retrieval runs, deciding whether the single best match found is good enough to trust at all. If the embedding model or the corpus never finds a truly relevant paper in the first place, nothing in Fix 1 rescues that — it can only decide, honestly, whether to admit the result isn't good enough.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">03</span>
+          <span class="qa-item__q-text">Is Fix 2 a post-generation step — does alpha rearrange the report after it's written?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>No — both fixes finish their work <em style="font-style:normal;color:var(--ink-0);">before</em> generation starts. The real order is retrieval → Fix 1 gate → Fix 2 rerank (if enabled) → generation, last. Fix 2 decides what order the papers are handed to the model as context; it never touches a report, because at the point it runs, no report exists yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">04</span>
+          <span class="qa-item__q-text">What should alpha actually be set to — is one fixed value enough?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>α = 1 is pure similarity; α = 0 is pure citation count. A fixed 0.5 is a reasonable default, but the sharper answer: lean toward similarity for emerging or narrowly technical questions — citations take years to accumulate, so heavy citation-weighting structurally buries new work — and toward citations for "what's the standard approach" questions, or when the embedding model's precision is shaky. The more rigorous version doesn't hardcode alpha at all: it's query-adaptive, and it retrieves a wider pool before reranking, since right now Fix 2 can only reorder whatever already survived the same top-k cutoff retrieval used.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">05</span>
+          <span class="qa-item__q-text">Should the similarity threshold adapt too — go lower for emerging topics with less published work?</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <p>I pushed back on my own instinct here. Lowering the threshold for presumed topic novelty is circular — you can't know a topic is under-covered without already having assessed the thing the threshold measures. It's also the more dangerous failure mode: it lets thin, tangential evidence get accepted as sufficient, producing a more convincing wrong answer instead of an honest "not enough here." The better fix is calibrating the threshold relative to the corpus's own similarity distribution rather than one hand-picked constant, and checking the gap between the top result and the rest of the pool — a real signal often stands out from its own noise floor even at a modest absolute score.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="conclusion">
+    <div class="eyebrow">Where this leaves things</div>
+    <h2>Retrieval is fragile. Recovery shouldn't be optional.</h2>
+    <p class="recap">Retrieval is <b>unambiguously fragile</b> — noise-level similarity scores on an off-topic query, visible directly in the numbers. Whether a generated report reflects that depended entirely on one model's judgment call, until Fix&nbsp;1 turned it into a mechanical guarantee. Fix&nbsp;2 provably reorders the ranking and protects against exclusion at the top-k boundary — but its effect on this particular model's narrative was more modest than expected. That's a real finding, not a shortcoming to hide.</p>
+
+    <div class="glass next-step reveal">
+      <div class="next-step__badge">→</div>
+      <div>
+        <h3>Proposed next layer: faithfulness verification</h3>
+        <p>After generation, mechanically check that each inline citation's claim is actually supported by that paper's abstract — the same category of fix as Fix&nbsp;1: replacing "hope the model got it right" with something inspectable and guaranteed, applied one step later in the pipeline.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p class="footer__name">Trustan Price — University of Illinois Urbana-Champaign · Forward Data Lab, Task 1</p>
+    <p>task0 / retrieval + rerank + generate — live run, claude-opus-5 — 2026-08-13</p>
+  </footer>
+
+</main>
+
+<script>
+(function () {
+  var DATA = {
+    on_topic: [
+      {
+      label: "Hallucinations",
+      query: "How does retrieval-augmented generation reduce hallucinations in large language models?",
+      papers: [
+        { title: "Benchmarking Retrieval-Augmented Generation for Medicine", similarity: 0.5667269229888916, citations: 588 },
+        { title: "Retrieval augmented generation for large language models in healthcare: A systematic review", similarity: 0.5096324682235718, citations: 211 },
+        { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: 0.5021803975105286, citations: 909 },
+        { title: "Improving large language model applications in biomedicine with retrieval-augmented generation: a systematic review, meta-analysis, and clinical development guidelines", similarity: 0.4989597797393799, citations: 163 },
+        { title: "Retrieval-Augmented Generation for Large Language Models: A Survey", similarity: 0.4652036428451538, citations: 3837 },
+        { title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks", similarity: 0.42475178837776184, citations: 16973 },
+        { title: "MultiHop-RAG: Benchmarking Retrieval-Augmented Generation for Multi-Hop Queries", similarity: 0.40638118982315063, citations: 314 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for Evaluating Retrieval-Augmented Generation Systems", similarity: 0.39639046788215637, citations: 76 }
+      ],
+      report: "# How Retrieval-Augmented Generation Reduces Hallucinations in LLMs\n\n## Core Mechanism\n\nRAG addresses hallucination by supplementing an LLM's parametric memory with explicit, non-parametric external knowledge that is retrieved at inference time and used to condition generation [5][6]. The original formulation combined a pre-trained seq2seq generator with a dense vector index of Wikipedia accessed via a neural retriever, and showed that such models produce \"more specific, diverse and factual language\" than a parametric-only baseline [6]. By grounding outputs in a reference textual database, RAG reduces the risk that the model fabricates content, while also improving credibility, traceability of provenance, and the ability to update knowledge without retraining [3][5][6]. This directly targets three linked weaknesses of standalone LLMs: hallucination, outdated training data, and non-transparent reasoning [5][2].\n\n## Empirical Evidence\n\nIn medicine, RAG systems improved accuracy for six LLMs by up to 18% over chain-of-thought prompting, raising GPT-3.5 and Mixtral to GPT-4-level performance, with the best results from combining multiple corpora and retrievers [1]. A meta-analysis of biomedical studies found a pooled odds ratio of 1.35 (95% CI 1.19\u20131.53) favoring RAG over baseline LLMs [4].\n\n## Limits and Caveats\n\nReduction is not elimination: faithfulness depends on both retrieving relevant passages and the LLM actually exploiting them, which is why reference-free metrics decompose these dimensions [3]. Known failure modes include \"lost-in-the-middle\" effects [1], poor performance on multi-hop queries requiring reasoning over several evidence pieces [7], and difficulty with later conversational turns and unanswerable questions [8]. Healthcare reviews also note the absence of standardized evaluation frameworks [2]."
+    },
+      {
+      label: "Healthcare",
+      query: "What are the applications of retrieval-augmented generation in healthcare and medicine?",
+      papers: [
+        { title: "Retrieval augmented generation for large language models in healthcare: A systematic review", similarity: 0.5616934895515442, citations: 211 },
+        { title: "Benchmarking Retrieval-Augmented Generation for Medicine", similarity: 0.5259025692939758, citations: 588 },
+        { title: "Improving large language model applications in biomedicine with retrieval-augmented generation: a systematic review, meta-analysis, and clinical development guidelines", similarity: 0.467790424823761, citations: 163 },
+        { title: "Retrieval-Augmented Generation for AI-Generated Content: A Survey", similarity: 0.4580203592777252, citations: 673 },
+        { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: 0.44539177417755127, citations: 909 },
+        { title: "Retrieval-Augmented Generation for Large Language Models: A Survey", similarity: 0.43658778071403503, citations: 3837 },
+        { title: "Retrieval-Augmented Generation (RAG) Chatbots for Education: A Survey of Applications", similarity: 0.4254491329193115, citations: 103 },
+        { title: "MedRAG: Enhancing Retrieval-augmented Generation with Knowledge Graph-Elicited Reasoning for Healthcare Copilot", similarity: 0.41891199350357056, citations: 186 }
+      ],
+      report: "**Applications of RAG in Healthcare and Medicine**\n\nRetrieval-augmented generation has been adopted in healthcare primarily to address the limitations of large language models\u2014outdated training data, hallucination, and opacity\u2014by grounding outputs in external medical knowledge sources [1]. A dominant application area is medical question answering: the MIRAGE benchmark and MedRAG toolkit show that combining medical corpora with retrievers improves accuracy of six LLMs by up to 18% over chain-of-thought prompting, lifting GPT-3.5 and Mixtral to GPT-4-level performance across five medical QA datasets [2]. RAG is also applied to clinical decision support and diagnosis: knowledge graph-enhanced RAG can retrieve privacy-sensitive Electronic Health Records and integrate hierarchical diagnostic knowledge to produce diagnosis and treatment recommendations, reduce misdiagnosis for diseases with similar manifestations, and generate follow-up questions for personalized decision-making [8]. A systematic review and meta-analysis of biomedical studies found a pooled odds ratio of 1.35 (95% CI 1.19\u20131.53) favoring RAG over baseline LLMs across a range of clinical tasks, and proposed development guidelines for clinical deployment [3]. Remaining gaps include the lack of standardized evaluation frameworks, English-dominant datasets, limited attention to ethical considerations, and the need for deeper integration of RAG systems into electronic health records and agent-based architectures [1][3]."
+    },
+      {
+      label: "Benchmarking",
+      query: "How do researchers benchmark and evaluate retrieval-augmented generation systems?",
+      papers: [
+        { title: "Retrieval-Augmented Generation for AI-Generated Content: A Survey", similarity: 0.6489658355712891, citations: 673 },
+        { title: "Benchmarking Retrieval-Augmented Generation for Medicine", similarity: 0.6274698972702026, citations: 588 },
+        { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: 0.611083984375, citations: 909 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for Evaluating Retrieval-Augmented Generation Systems", similarity: 0.6015055775642395, citations: 76 },
+        { title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks", similarity: 0.5816624164581299, citations: 16973 },
+        { title: "Retrieval-Augmented Generation for Large Language Models: A Survey", similarity: 0.5807456970214844, citations: 3837 },
+        { title: "MultiHop-RAG: Benchmarking Retrieval-Augmented Generation for Multi-Hop Queries", similarity: 0.5541839599609375, citations: 314 },
+        { title: "Agentic Retrieval-Augmented Generation: A Survey on Agentic RAG", similarity: 0.5092189311981201, citations: 383 }
+      ],
+      report: "RAG evaluation generally decomposes the pipeline into retrieval and generation components, assessing whether retrieved passages are relevant and focused, whether the LLM uses them faithfully, and whether the final answer is of high quality \u2014 dimensions operationalized in reference-free, annotation-free metric suites such as RAGAs [3], with surveys noting these evaluation frameworks and benchmarks as a standard part of the RAG landscape [1][6]. Early work evaluated RAG largely through downstream task accuracy on knowledge-intensive NLP benchmarks, e.g., open-domain QA and generation tasks measured for specificity and factuality against parametric-only baselines [5]. More recent efforts build purpose-built benchmarks that stress particular capabilities: MultiHop-RAG supplies a knowledge base, multi-hop queries, ground-truth answers, and supporting evidence to separately benchmark embedding models for evidence retrieval and LLMs for reasoning over that evidence [7]; mtRAG uses human-generated multi-turn conversations across four domains to test later-turn, unanswerable, and non-standalone questions, combining human judgments with synthetic data and LLM-as-a-Judge automation [4]. Domain-specific benchmarking also emphasizes systematic ablation of pipeline configurations \u2014 MIRAGE evaluates 7,663 medical questions across 41 combinations of corpora, retrievers, and backbone LLMs to derive best-practice guidelines and surface phenomena such as scaling behavior and \"lost-in-the-middle\" effects [2]. Across this literature, evaluation remains an acknowledged open challenge, particularly for newer agentic RAG systems whose dynamic, multi-step workflows are harder to score than static pipelines [8]."
+    }
+    ],
+    off_topic: [
+      {
+      label: "Coral reefs",
+      query: "What are the effects of ocean acidification on coral reef ecosystems?",
+      papers: [
+        { title: "Improving large language model applications in biomedicine with retrieval-augmented generation: a systematic review, meta-analysis, and clinical development guidelines", similarity: 0.023568887263536453, citations: 163 },
+        { title: "PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models", similarity: -0.0033609718084335327, citations: 268 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for Evaluating Retrieval-Augmented Generation Systems", similarity: -0.014370199292898178, citations: 76 },
+        { title: "G-Retriever: Retrieval-Augmented Generation for Textual Graph Understanding and Question Answering", similarity: -0.021786121651530266, citations: 335 },
+        { title: "ViDoRAG: Visual Document Retrieval-Augmented Generation via Dynamic Iterative Reasoning Agents", similarity: -0.024366572499275208, citations: 69 },
+        { title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks", similarity: -0.029770707711577415, citations: 16973 },
+        { title: "Agentic Retrieval-Augmented Generation: A Survey on Agentic RAG", similarity: -0.031780023127794266, citations: 383 },
+        { title: "RAGAs: Automated Evaluation of Retrieval Augmented Generation", similarity: -0.033591434359550476, citations: 909 }
+      ],
+      report: "The provided abstracts do not support an answer to this query. All eight sources concern retrieval-augmented generation (RAG) and large language models in natural language processing \u2014 covering foundational RAG methods [6], evaluation frameworks and benchmarks [3], [8], graph- and vision-based RAG variants [4], [5], agentic RAG architectures [7], security vulnerabilities such as knowledge-corruption attacks [2], and biomedical/clinical applications [1]. None of them address ocean acidification, coral reefs, marine biology, or any environmental science topic. To answer your question, you would need a different set of sources drawn from marine or climate science literature."
+    },
+      {
+      label: "Aurora borealis",
+      query: "What causes the northern lights to appear in different colors?",
+      papers: [
+        { title: "VDocRAG: Retrieval-Augmented Generation over Visually-Rich Documents", similarity: 0.013940423727035522, citations: 64 },
+        { title: "LightRAG: Simple and Fast Retrieval-Augmented Generation", similarity: 0.008743414655327797, citations: 406 },
+        { title: "ViDoRAG: Visual Document Retrieval-Augmented Generation via Dynamic Iterative Reasoning Agents", similarity: 0.003946887329220772, citations: 69 },
+        { title: "HyperGraphRAG: Retrieval-Augmented Generation via Hypergraph-Structured Knowledge Representation", similarity: -0.007192937657237053, citations: 65 },
+        { title: "PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models", similarity: -0.028381269425153732, citations: 268 },
+        { title: "MultiHop-RAG: Benchmarking Retrieval-Augmented Generation for Multi-Hop Queries", similarity: -0.04707181826233864, citations: 314 },
+        { title: "Benchmarking Retrieval-Augmented Generation for Medicine", similarity: -0.059929266571998596, citations: 588 },
+        { title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks", similarity: -0.06189873814582825, citations: 16973 }
+      ],
+      report: "The provided abstracts cannot answer this query. All eight sources concern retrieval-augmented generation (RAG) for large language models \u2014 covering the original RAG architecture [8], graph- and hypergraph-based knowledge representations [2][4], visually-rich document retrieval [1][3], benchmarks for multi-hop and medical question answering [6][7], and security vulnerabilities such as knowledge-corruption attacks [5]. None of them discuss atmospheric physics, auroral emissions, or the excitation of oxygen and nitrogen that would be relevant to the coloration of the northern lights. To answer this question, you would need sources from space physics or atmospheric science rather than this natural language processing literature."
+    },
+      {
+      label: "Fall of Rome",
+      query: "What were the primary economic causes of the fall of the Roman Empire?",
+      papers: [
+        { title: "PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models", similarity: 0.034304264932870865, citations: 268 },
+        { title: "Retrieval-Augmented Generation for AI-Generated Content: A Survey", similarity: -0.012323453091084957, citations: 673 },
+        { title: "VDocRAG: Retrieval-Augmented Generation over Visually-Rich Documents", similarity: -0.021193675696849823, citations: 64 },
+        { title: "LightRAG: Simple and Fast Retrieval-Augmented Generation", similarity: -0.02190692350268364, citations: 406 },
+        { title: "HyperGraphRAG: Retrieval-Augmented Generation via Hypergraph-Structured Knowledge Representation", similarity: -0.02657320722937584, citations: 65 },
+        { title: "G-Retriever: Retrieval-Augmented Generation for Textual Graph Understanding and Question Answering", similarity: -0.028446458280086517, citations: 335 },
+        { title: "ViDoRAG: Visual Document Retrieval-Augmented Generation via Dynamic Iterative Reasoning Agents", similarity: -0.040754470974206924, citations: 69 },
+        { title: "MTRAG: A Multi-Turn Conversational Benchmark for Evaluating Retrieval-Augmented Generation Systems", similarity: -0.04378649592399597, citations: 76 }
+      ],
+      report: "The provided abstracts do not support an answer to this query. All eight sources are computer science papers about retrieval-augmented generation (RAG) systems for large language models, covering topics such as knowledge-corruption attacks on RAG databases [1], surveys of RAG for AI-generated content [2], retrieval over visually-rich documents [3][7], graph- and hypergraph-structured retrieval [4][5][6], and multi-turn conversational RAG benchmarks [8]. None of them discuss Roman history, ancient economies, taxation, currency debasement, trade, or any other economic factor relevant to the fall of the Roman Empire. To answer your question, you would need sources from historical or economic-history scholarship rather than this collection."
+    }
+    ]
+  };
+
+  var THRESHOLD = 0.30;
+  var state = { category: 'on_topic', index: 0, fix1: true, fix2: false, alpha: 0.5 };
+
+  function currentEntry() { return DATA[state.category][state.index]; }
+
+  function log1p(x) { return Math.log(1 + x); }
+
+  function minMax(vals) {
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    if (hi === lo) return vals.map(function () { return 1; });
+    return vals.map(function (v) { return (v - lo) / (hi - lo); });
+  }
+
+  // Mirrors src/rerank/rerank.py's blend_scores() exactly: log1p citation
+  // counts, min-max normalize both signals within this pool, blend by alpha.
+  function blend(papers, alpha) {
+    var logCites = papers.map(function (p) { return log1p(p.citations); });
+    var normSim = minMax(papers.map(function (p) { return p.similarity; }));
+    var normCite = minMax(logCites);
+    return papers.map(function (p, i) {
+      var copy = {};
+      for (var k in p) copy[k] = p[k];
+      copy.normSim = normSim[i];
+      copy.normCite = normCite[i];
+      copy.blended = alpha * normSim[i] + (1 - alpha) * normCite[i];
+      return copy;
+    }).sort(function (a, b) { return b.blended - a.blended; });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function formatReport(text) {
+    var t = escapeHtml(text);
+    t = t.replace(/^## (.+)$/gm, '<strong style="color:var(--ink-0);display:block;margin-top:14px;">$1</strong>');
+    t = t.replace(/^# (.+)$/gm, '<strong style="color:var(--ink-0);display:block;font-size:1.05em;margin-bottom:4px;">$1</strong>');
+    t = t.replace(/\[(\d+)\]/g, '<span style="color:var(--accent-strong);font-size:0.82em;vertical-align:super;">[$1]</span>');
+    return t;
+  }
+
+  var els = {
+    categoryToggle: document.getElementById('category-toggle'),
+    queryPicker: document.getElementById('query-picker'),
+    fix1Toggle: document.getElementById('fix1-toggle'),
+    fix2Toggle: document.getElementById('fix2-toggle'),
+    alphaSlider: document.getElementById('alpha-slider'),
+    alphaEndcaps: document.getElementById('alpha-endcaps'),
+    alphaInline: document.getElementById('alpha-inline'),
+    activeQuery: document.getElementById('active-query'),
+    ledger: document.getElementById('paper-ledger'),
+    verdict: document.getElementById('verdict'),
+    explainText: document.getElementById('explain-text'),
+    revealBtn: document.getElementById('reveal-report-btn'),
+    reportReveal: document.getElementById('report-reveal'),
+    reportLabel: document.getElementById('report-reveal-label'),
+    reportText: document.getElementById('report-reveal-text')
+  };
+
+  function renderPicker() {
+    var entries = DATA[state.category];
+    els.queryPicker.innerHTML = entries.map(function (e, i) {
+      return '<button class="query-pill' + (i === state.index ? ' is-active' : '') + '" type="button" data-index="' + i + '">' + escapeHtml(e.label) + '</button>';
+    }).join('');
+  }
+
+  function explainText(ctx, changedWhat) {
+    var categoryLabel = state.category === 'on_topic' ? 'on-topic' : 'off-topic';
+    if (changedWhat === 'fix1') {
+      if (!state.fix1) {
+        return 'Fix 1 disabled &mdash; the pipeline will call the model regardless of similarity (the naive, pre-fix behavior). Top similarity <code>' + ctx.topSim.toFixed(3) + '</code> is no longer checked against anything.';
+      }
+      return ctx.refused
+        ? 'Fix 1 enabled: <code>' + ctx.topSim.toFixed(3) + ' &lt; ' + THRESHOLD.toFixed(2) + '</code> &rarr; refused before any API call.'
+        : 'Fix 1 enabled: <code>' + ctx.topSim.toFixed(3) + ' ≥ ' + THRESHOLD.toFixed(2) + '</code> &rarr; proceeds to generation.';
+    }
+    if (changedWhat === 'fix2') {
+      if (!state.fix2) return 'Fix 2 disabled &mdash; the ledger above is sorted by raw embedding similarity only.';
+      var top = ctx.display[0];
+      return 'Fix 2 enabled at <code>α = ' + state.alpha.toFixed(2) + '</code>: "' + top.title + '" now ranks #1 &mdash; blended <code>' + top.blended.toFixed(3) + ' = ' + state.alpha.toFixed(2) + ' × sim(' + top.normSim.toFixed(3) + ') + ' + (1 - state.alpha).toFixed(2) + ' × cites(' + top.normCite.toFixed(3) + ')</code>.';
+    }
+    if (changedWhat === 'alpha') {
+      var top2 = ctx.display[0];
+      return '<code>α = ' + state.alpha.toFixed(2) + '</code> &mdash; blend recomputed live for all 8 papers. Current #1: "' + top2.title + '" at <code>' + top2.blended.toFixed(3) + '</code>.';
+    }
+    if (changedWhat === 'query') {
+      return 'Switched to <b style="color:var(--ink-0)">' + escapeHtml(currentEntry().label) + '</b> (' + categoryLabel + ') &mdash; same 18-paper corpus, same embedding model, same code path, only the query text changed. Top similarity is now <code>' + ctx.topSim.toFixed(3) + '</code>.';
+    }
+    return 'Toggle a control above to watch the pipeline recompute in real time, on the real numbers.';
+  }
+
+  function render(changedWhat) {
+    var d = currentEntry();
+    var raw = d.papers;
+    var topSim = raw[0].similarity;
+    var refused = state.fix1 && topSim < THRESHOLD;
+    var display = (state.fix2 && !refused) ? blend(raw, state.alpha) : raw;
+
+    // reset any open report reveal on every interaction - it belongs to
+    // whatever state was active when it was opened, not the new one
+    els.reportReveal.hidden = true;
+    els.revealBtn.textContent = 'Reveal the generated report →';
+
+    // FLIP animation: capture pre-render positions keyed by title
+    var oldRects = {};
+    Array.prototype.forEach.call(els.ledger.children, function (li) {
+      oldRects[li.dataset.title] = li.getBoundingClientRect();
+    });
+
+    els.activeQuery.innerHTML = 'Active query: <b>“' + escapeHtml(d.query) + '”</b>';
+
+    els.ledger.innerHTML = display.map(function (p, i) {
+      var isTop = i === 0;
+      var showBlend = state.fix2 && !refused;
+      var simDisplay = showBlend ? p.blended.toFixed(3) : p.similarity.toFixed(3);
+      var simLabel = showBlend ? 'blend' : 'sim';
+      return '<li class="ledger-item' + (isTop ? ' ledger-item--top' : '') + '" data-title="' + escapeHtml(p.title) + '">' +
+        '<span class="ledger-item__n">' + (i + 1) + '</span>' +
+        '<span class="ledger-item__t">' + escapeHtml(p.title) + '</span>' +
+        '<span class="ledger-item__sim">' + simLabel + ' ' + simDisplay + '</span>' +
+        '<span class="ledger-item__cite">' + p.citations.toLocaleString() + ' cites</span>' +
+        '</li>';
+    }).join('');
+
+    Array.prototype.forEach.call(els.ledger.children, function (li) {
+      var oldRect = oldRects[li.dataset.title];
+      if (!oldRect) return;
+      var newRect = li.getBoundingClientRect();
+      var dy = oldRect.top - newRect.top;
+      if (Math.abs(dy) < 1) return;
+      li.style.transition = 'none';
+      li.style.transform = 'translateY(' + dy + 'px)';
+      requestAnimationFrame(function () {
+        li.style.transition = 'transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        li.style.transform = '';
+      });
+    });
+
+    if (refused) {
+      els.verdict.className = 'verdict verdict--stop';
+      els.verdict.textContent = 'Refused — top similarity ' + topSim.toFixed(3) + ' < threshold ' + THRESHOLD.toFixed(2) + '. No API call made.';
+      els.revealBtn.hidden = true;
+    } else {
+      els.verdict.className = 'verdict verdict--go';
+      els.verdict.textContent = state.fix1
+        ? 'Proceeds — top similarity ' + topSim.toFixed(3) + ' ≥ threshold ' + THRESHOLD.toFixed(2) + '.'
+        : 'Proceeds — Fix 1 disabled, similarity not checked.';
+      els.revealBtn.hidden = false;
+    }
+
+    els.alphaInline.textContent = state.fix2 ? ' (α ' + state.alpha.toFixed(2) + ')' : '';
+    els.alphaSlider.hidden = !state.fix2;
+    els.alphaEndcaps.hidden = !state.fix2;
+    els.alphaSlider.style.setProperty('--fill', (state.alpha * 100) + '%');
+
+    els.explainText.innerHTML = explainText({ topSim: topSim, refused: refused, display: display }, changedWhat);
+  }
+
+  els.categoryToggle.addEventListener('click', function (e) {
+    var btn = e.target.closest('.segmented__btn');
+    if (!btn) return;
+    Array.prototype.forEach.call(els.categoryToggle.children, function (b) { b.classList.remove('is-active'); });
+    btn.classList.add('is-active');
+    state.category = btn.dataset.category;
+    state.index = 0;
+    renderPicker();
+    render('query');
+  });
+
+  els.queryPicker.addEventListener('click', function (e) {
+    var btn = e.target.closest('.query-pill');
+    if (!btn) return;
+    state.index = parseInt(btn.dataset.index, 10);
+    renderPicker();
+    render('query');
+  });
+
+  els.fix1Toggle.addEventListener('change', function () {
+    state.fix1 = els.fix1Toggle.checked;
+    render('fix1');
+  });
+
+  els.fix2Toggle.addEventListener('change', function () {
+    state.fix2 = els.fix2Toggle.checked;
+    render('fix2');
+  });
+
+  els.alphaSlider.addEventListener('input', function () {
+    state.alpha = parseFloat(els.alphaSlider.value);
+    render('alpha');
+  });
+
+  els.revealBtn.addEventListener('click', function () {
+    var d = currentEntry();
+    var isHidden = els.reportReveal.hidden;
+    if (isHidden) {
+      els.reportLabel.textContent = 'Captured live against claude-opus-5, 2026-08-13 — replayed verbatim. This is the real non-reranked transcript for this query; a static page can’t safely hold a live API key to re-call it for every blend weight.';
+      els.reportText.innerHTML = formatReport(d.report);
+      els.reportReveal.hidden = false;
+      els.revealBtn.textContent = 'Hide the generated report ↑';
+    } else {
+      els.reportReveal.hidden = true;
+      els.revealBtn.textContent = 'Reveal the generated report →';
+    }
+  });
+
+  renderPicker();
+  render();
+
+  // ---------- questions I asked accordion ----------
+  Array.prototype.forEach.call(document.querySelectorAll('.qa-item'), function (item) {
+    var btn = item.querySelector('.qa-item__q');
+    btn.addEventListener('click', function () {
+      var isOpen = item.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+  });
+
+  // ---------- reveal on scroll ----------
+  var revealEls = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) {
+    Array.prototype.forEach.call(revealEls, function (el) { el.classList.add('is-visible'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    Array.prototype.forEach.call(revealEls, function (el) { io.observe(el); });
+  }
+})();
+</script>
+
+</body>
+</html>
