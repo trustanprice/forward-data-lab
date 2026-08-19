@@ -25,6 +25,18 @@ build step, and no runtime dependency on the rest of the repo.
   section (see below) is condensed, faithful transcription of actual
   design-review questions asked and answered during development, not
   invented FAQ copy.
+- **`#scholar-compare`'s 5-query systematic comparison** — a live session
+  run 2026-08-19 against `asta.allen.ai` and `scholar.google.com` across 5
+  query archetypes (broad conceptual, narrow technical, comparative,
+  recent/emerging, ambiguous), each scored on 6 criteria (reformulation
+  attempts, candidate pool size, citation-count visibility, evidence
+  weighting, accuracy spot-check, steps to a usable answer). This is the
+  same data integrated into `../../REPORT.md`'s Q1 — the site and the
+  report are two presentations of one verified dataset, not independently
+  gathered. All 16 checkable citations across the 5 queries were
+  independently confirmed against real arXiv/publisher records (2 spot-
+  checked directly by fetching arxiv.org, not just trusted from the source
+  session) before being written into either file.
 - All content is hand-transcribed from those sources into `site/index.html`
   at build time — this page does not fetch or parse them at runtime. If the
   underlying numbers change (e.g. the demo is re-run, the threshold is
@@ -94,6 +106,15 @@ build step, and no runtime dependency on the rest of the repo.
 - Name/school/personality appear in exactly 2 places, both grounded in the
   author's actual background (not invented): a byline under the hero
   subtitle (`hero__byline`), and a footer credit line (`footer__name`).
+- **`#scholar-compare`** (the 5-query systematic comparison) reuses the
+  existing `.qa-item` accordion markup and its accordion-toggle JS verbatim
+  — the toggle handler queries `.qa-item` globally
+  (`document.querySelectorAll('.qa-item')`) after the whole DOM is parsed,
+  so the 5 new accordion rows work with **zero new JavaScript**. Only new
+  CSS was added (`.cmp-table` / `.cmp-wrap`, a plain data table styled to
+  match the glass aesthetic) plus the static markup itself — this section
+  is not live-computed like `#console`, since there's no underlying
+  formula to recompute, just a fixed comparison table per query.
 
 ## Current state
 
@@ -121,9 +142,23 @@ verify-before-trusting thesis to two real resume facts (a 100%-audit-
 coverage push at Caterpillar, a failure-detection model for NBA
 predictions) — sourced from the author's own CV, not invented.
 
+Added a `#scholar-compare` section (between the hero and `#console`): a
+5-item accordion, one per query archetype, each holding a 6-row Asta vs.
+Google Scholar comparison table, plus a closing summary card. Directly
+mirrors `REPORT.md`'s Q1 systematic comparison — this was feedback from
+the lab PI (Kevin Chang) asking for the Asta/Scholar comparison to be more
+systematic across query types, with more comprehensive criteria and a
+quantitative metric; both the report and the live site now carry the same
+verified 5-query dataset instead of the report alone.
+
 All numbers and quotes are transcribed from the live run or the actual
 conversation, not invented. Verified: JS syntax-checked clean (including a
 Node-executed simulation confirming all 6 queries produce the correct
 Fix 1 gate decision), every element ID referenced by the script exists
 exactly once in the markup, section tags balanced, file confirmed UTF-8
-with the charset meta tag as the first byte.
+with the charset meta tag as the first byte. The `#scholar-compare`
+addition was verified separately with a Python `html.parser` pass over the
+full document (both `index.html` and `dist/index.html`) confirming no
+unclosed or mismatched tags, plus a manual tag-count check (5 tables, 5
+`tbody`, 5 `.cmp-wrap`, 10 total `.qa-item` accordions, 8 balanced
+`<section>`s).

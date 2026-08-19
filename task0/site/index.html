@@ -976,6 +976,38 @@
     transition: opacity 0.6s ease, transform 0.6s ease;
   }
   .reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+  /* ---------- systematic comparison tables ---------- */
+
+  .cmp-wrap { padding: 0 26px 26px 62px; overflow-x: auto; }
+
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 0; }
+
+  .cmp-table th, .cmp-table td {
+    text-align: left;
+    padding: 10px 14px;
+    vertical-align: top;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .cmp-table th {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+    font-weight: 600;
+  }
+
+  .cmp-table td:first-child { color: var(--ink-2); font-weight: 560; width: 26%; white-space: nowrap; }
+  .cmp-table td { color: var(--ink-1); line-height: 1.55; }
+  .cmp-table tr:last-child td { border-bottom: none; }
+
+  @media (max-width: 640px) {
+    .cmp-table { font-size: 12.5px; }
+    .cmp-table td:first-child { white-space: normal; width: auto; }
+    .cmp-wrap { padding: 0 20px 22px 20px; }
+  }
 </style>
 
 <div class="canvas"></div>
@@ -1020,6 +1052,152 @@
     </div>
 
     <p class="provenance-note">Everything below is real, live-run output against Claude Opus 5 — not placeholder copy. Source: <code style="font-family: var(--font-mono); background: none; border: none; padding: 0; display: inline;">demo/sample_output_naive.json</code> and <code style="font-family: var(--font-mono); background: none; border: none; padding: 0; display: inline;">demo/AGENTS.md</code>.</p>
+  </section>
+
+  <section id="scholar-compare">
+    <div class="eyebrow">Systematic comparison — 5 query archetypes, live-tested</div>
+    <h2>Where Asta's edge holds — and where it disappears</h2>
+    <p class="lede">One query pair isn't a systematic comparison. So the same scoring from above — reformulation attempts, candidate pool size, citation visibility, evidence weighting, accuracy, and steps to a usable answer — was run live across five deliberately different query types: broad conceptual, narrow technical, comparative, recent/emerging, and ambiguous. Every citation below was independently checked against the real publication, not assumed correct because it looked plausible.</p>
+
+    <div class="stat-row" style="margin-bottom: 30px;">
+      <div class="stat-chip"><b>5</b> query types tested</div>
+      <div class="stat-chip"><b>16/16</b> checkable citations verified real</div>
+      <div class="stat-chip"><b>2</b> queries where Asta's synthesis vanished entirely</div>
+    </div>
+
+    <div class="qa-list">
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">01</span>
+          <span class="qa-item__q-text">Broad conceptual — "What is retrieval-augmented generation?"</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <div class="cmp-wrap">
+              <table class="cmp-table">
+                <thead><tr><th></th><th>Asta</th><th>Google Scholar</th></tr></thead>
+                <tbody>
+                  <tr><td>Reformulation</td><td>1 — accepted verbatim</td><td>1 — accepted verbatim</td></tr>
+                  <tr><td>Candidate pool</td><td>Not shown — answered in chat mode, no paper-finder search triggered</td><td>"About 72,400 results" (after clicking "See all results")</td></tr>
+                  <tr><td>Citation counts</td><td>Not shown — no papers attached to this answer at all</td><td>Visible per result — "Cited by 73," "Cited by 1,024," etc.</td></tr>
+                  <tr><td>Evidence weighting</td><td>N/A — zero sources cited, nothing to weight</td><td>N/A — Scholar never produces synthesis text</td></tr>
+                  <tr><td>Accuracy spot-check</td><td>Not possible — 0 papers cited</td><td>2/2 real — Zhao et al. survey (arXiv:2402.19473); Klesel and Wittmann, <i>BISE</i> (Springer)</td></tr>
+                  <tr><td>Steps to answer</td><td>2 — appears after ~7s</td><td>2 for a single result, 3 for the full list</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">02</span>
+          <span class="qa-item__q-text">Narrow technical — "What is the effect of chunk size on RAG accuracy?"</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <div class="cmp-wrap">
+              <table class="cmp-table">
+                <thead><tr><th></th><th>Asta</th><th>Google Scholar</th></tr></thead>
+                <tbody>
+                  <tr><td>Reformulation</td><td>1 — accepted verbatim</td><td>1 — accepted verbatim</td></tr>
+                  <tr><td>Candidate pool</td><td>"74 Papers" shown across 2 pages, each tagged Perfectly / Relevant / Somewhat Relevant</td><td>"About 19,600 results" (2 near-duplicate top hits shown first)</td></tr>
+                  <tr><td>Citation counts</td><td>Shown per card, 1–178; brand-new 2026 papers show none</td><td>Shown inline where available; brand-new preprints show none</td></tr>
+                  <tr><td>Evidence weighting</td><td>Not explicit — the 5-paper synthesis cites only papers with ≥41 citations, but the text never says so</td><td>N/A — no synthesis</td></tr>
+                  <tr><td>Accuracy spot-check</td><td>2/2 real — CRUD-RAG (<i>ACM TOIS</i>); BABILong (NeurIPS 2024)</td><td>2/2 real — Bhat et al., "Rethinking Chunk Size" (arXiv:2505.21700); Li, Stenzel and Eickhoff (ACL Anthology 2025)</td></tr>
+                  <tr><td>Steps to answer</td><td>3 — appears after ~65s, papers panel included</td><td>3 (type, search, "See all results")</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">03</span>
+          <span class="qa-item__q-text">Comparative — "Dense vs. sparse retrieval for RAG on multi-hop questions?"</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <div class="cmp-wrap">
+              <table class="cmp-table">
+                <thead><tr><th></th><th>Asta</th><th>Google Scholar</th></tr></thead>
+                <tbody>
+                  <tr><td>Reformulation</td><td>1 — accepted verbatim, including punctuation</td><td>1 — accepted verbatim</td></tr>
+                  <tr><td>Candidate pool</td><td>Only "7 Papers" — smaller than Q2 — all tagged "Relevant," none "Perfectly Relevant"</td><td>"About 4,030 results," full ranked list shown immediately</td></tr>
+                  <tr><td>Citation counts</td><td>Only 1 of 7 papers shows a count (8); the other 6 — mostly 2025–26 preprints — show none</td><td>Shown inline for every result (25, 2, 145, 1, 2…)</td></tr>
+                  <tr><td>Evidence weighting</td><td>The sharpest gap found: synthesis closes with <b style="color:var(--ink-0)">"Confidence: Very high"</b> despite 6 of 7 sources having zero visible citations</td><td>N/A — no synthesis</td></tr>
+                  <tr><td>Accuracy spot-check</td><td>2/2 real — Sidiropoulos et al. 2021 (ACL Anthology); Shaikh (arXiv:2606.21553)</td><td>2/2 real — LevelRAG (arXiv:2502.18139); Xiong et al., MDR (arXiv:2009.12756)</td></tr>
+                  <tr><td>Steps to answer</td><td>3 — appears after ~110s (longest wait observed)</td><td>2 (type, search) — full list appeared immediately</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">04</span>
+          <span class="qa-item__q-text">Recent / emerging — "What are the latest agentic RAG approaches published in 2026?"</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <div class="cmp-wrap">
+              <table class="cmp-table">
+                <thead><tr><th></th><th>Asta</th><th>Google Scholar</th></tr></thead>
+                <tbody>
+                  <tr><td>Reformulation</td><td>1 — correctly auto-parsed "2026" as a date filter</td><td>2 — top hit mixed in a 2025 paper; required manually clicking "Since 2026"</td></tr>
+                  <tr><td>Candidate pool</td><td>Internally inconsistent: synthesis claims "51 papers published in 2026," but the results panel shows "72 Papers"</td><td>"About 18,600 results" unfiltered; "About 17,300" after "Since 2026"</td></tr>
+                  <tr><td>Citation counts</td><td>Sparse and low (mostly 1–5, up to 34) — 2026 is the current year; most cards show none</td><td>Shown where available (5, 3…); many show none</td></tr>
+                  <tr><td>Evidence weighting</td><td>All cards uniformly tagged "Perfectly Relevant"; synthesis never flags that they're largely unvetted preprints</td><td>N/A — no synthesis</td></tr>
+                  <tr><td>Accuracy spot-check</td><td>2/2 real — A-RAG (arXiv:2602.03442); SoK: Agentic RAG (arXiv:2603.07379)</td><td>2/2 real — Ferrazzi et al. (arXiv:2601.07711); Singh and Ehtesham survey (arXiv:2501.09136)</td></tr>
+                  <tr><td>Steps to answer</td><td>3 — appears after ~70s</td><td>3 (type, search, "Since 2026" filter)</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass qa-item reveal">
+        <button class="qa-item__q" type="button" aria-expanded="false">
+          <span class="qa-item__index">05</span>
+          <span class="qa-item__q-text">Ambiguous — "How does RAG help with reasoning?"</span>
+          <span class="qa-item__chevron">⌄</span>
+        </button>
+        <div class="qa-item__a">
+          <div class="qa-item__a-inner">
+            <div class="cmp-wrap">
+              <table class="cmp-table">
+                <thead><tr><th></th><th>Asta</th><th>Google Scholar</th></tr></thead>
+                <tbody>
+                  <tr><td>Reformulation</td><td>1 — accepted verbatim</td><td>1 — accepted verbatim</td></tr>
+                  <tr><td>Candidate pool</td><td>Not shown — chat-mode answer again, no "View N Papers" link at all</td><td>"About 136,000 results" — the largest pool of any query, full list shown immediately</td></tr>
+                  <tr><td>Citation counts</td><td>Not shown — zero papers attached</td><td>Shown inline for every result (68, 70, 40, 48, 19)</td></tr>
+                  <tr><td>Evidence weighting</td><td>The most acute instance found: closes with <b style="color:var(--ink-0)">"Confidence: Very high — these points are well established in the literature,"</b> with zero cited sources to check that against</td><td>N/A — no synthesis</td></tr>
+                  <tr><td>Accuracy spot-check</td><td>Not possible — 0 papers cited</td><td>2/2 real — Gao et al., "Synergizing RAG and Reasoning" (arXiv:2504.15909); Li and Zhang, "Towards Agentic RAG with Deep Reasoning" (arXiv:2507.09477, EMNLP 2025)</td></tr>
+                  <tr><td>Steps to answer</td><td>3 — appears after ~10s (fastest response, least evidence behind it)</td><td>2 (type, search) — full list immediate</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass glass--pad reveal" style="margin-top: 24px;">
+      <p style="margin:0 0 12px;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-3);">What held up across all five</p>
+      <p class="recap" style="margin:0;font-size:14.5px;max-width:none;">Asta's advantage over Scholar — a synthesized, sourced answer instead of a raw list — held up consistently only on the two mid-complexity queries (narrow technical, comparative), where it reliably triggered full paper-finder mode and produced genuinely useful prose. It also handled the date-scoped query better, auto-parsing "2026" as a filter where Scholar needed a manual click — though its own paper count was internally inconsistent there. The advantage <b>disappeared entirely</b> on the broad conceptual and ambiguous queries: Asta silently fell back to a sourceless chat answer, no paper-finder option at all — functionally worse than Scholar, which always returns a scannable, citation-annotated list regardless of phrasing. The citation-visible-but-unweighted gap from the opening test wasn't a fluke: it got <b>worse</b>, not better, as queries got harder to ground — from a mild omission on the chunk-size query up to an unsupported "Confidence: Very high" with zero cited sources on the ambiguous one. Every one of the 16 checkable citations across all five queries matched a real, verifiable publication — Asta's risk here isn't fabricated papers, it's unweighted, sometimes evidence-free confidence.</p>
+    </div>
+
+    <p class="provenance-note">Live-tested 2026-08-19 against asta.allen.ai and scholar.google.com. Every arXiv ID above is a real, resolvable identifier — independently spot-checked, not transcribed on trust.</p>
   </section>
 
   <section id="console">

@@ -136,6 +136,14 @@ as the "can it be implemented" demonstration plus a proposed improvement.
       exceptions; all 3 on-topic queries answered correctly. Saved at
       `demo/sample_output_extended.json`; all 6 queries are selectable in
       the site's interactive console. See `demo/AGENTS.md` § Replication.
+- [x] Added a systematic 5-query-archetype comparison of Asta vs. Google
+      Scholar (broad conceptual, narrow technical, comparative,
+      recent/emerging, ambiguous — 6 scored criteria each, 16/16 checkable
+      citations independently verified real) in response to PI feedback
+      that the original single-query comparison needed to be more
+      systematic and quantitative. Integrated into **both**
+      `../REPORT.md` (Q1) and the live site's new `#scholar-compare`
+      section — same dataset, two presentations. See `site/AGENTS.md`.
 
 ## Known design tradeoffs (updated as they're discovered)
 
